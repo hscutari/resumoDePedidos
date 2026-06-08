@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório de Produção — Shopee / Rápida / TikTok</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --shopee:#ee4d2d; --rapida:#2563eb; --tiktok:#111; --bg:#f5f6f8; --card:#fff;
+    --line:#e5e7eb; --txt:#1f2937; --muted:#6b7280;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       margin:0;background:var(--bg);color:var(--txt)}
+  header{background:#111827;color:#fff;padding:20px 24px}
+  header h1{margin:0;font-size:20px}
+  header p{margin:4px 0 0;color:#9ca3af;font-size:13px}
+  main{max-width:1000px;margin:0 auto;padding:24px}
+  #drop{border:2px dashed #9ca3af;border-radius:12px;background:var(--card);
+        padding:40px;text-align:center;cursor:pointer;transition:.15s}
+  #drop.hover{border-color:var(--rapida);background:#eff6ff}
+  #drop strong{color:var(--rapida)}
+  #files{font-size:13px;color:var(--muted);margin-top:10px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+  button{border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;
+         cursor:pointer;background:#111827;color:#fff}
+  button.secondary{background:#e5e7eb;color:#111827}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #status{font-size:13px;color:var(--muted);margin:8px 0}
+  .summary{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+  .chip{flex:1;min-width:140px;background:var(--card);border:1px solid var(--line);
+        border-radius:12px;padding:14px 16px}
+  .chip .t{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .chip .n{font-size:26px;font-weight:700}
+  .chip .s{font-size:12px;color:var(--muted)}
+  .chip.shopee{border-top:4px solid var(--shopee)}
+  .chip.rapida{border-top:4px solid var(--rapida)}
+  .chip.tiktok{border-top:4px solid var(--tiktok)}
+  .chip.total{border-top:4px solid #16a34a}
+  section.tipo{background:var(--card);border:1px solid var(--line);border-radius:12px;
+       margin:16px 0;overflow:hidden}
+  section.tipo h2{margin:0;padding:14px 18px;font-size:16px;color:#fff}
+  section.tipo h2 small{font-weight:400;opacity:.85}
+  .shopee h2{background:var(--shopee)} .rapida h2{background:var(--rapida)}
+  .tiktok h2{background:var(--tiktok)} .outros h2{background:#9333ea}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:8px 18px;border-top:1px solid var(--line);text-align:left}
+  th{background:#f9fafb;font-size:12px;color:var(--muted);text-transform:uppercase}
+  td.qty{font-weight:700;width:70px;text-align:right}
+  tr.empty td{color:var(--muted);font-style:italic}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:10px 14px;
+        border-radius:8px;font-size:13px;margin:12px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Relatório de Produção por Tipo</h1>
+  <p>Importe um ou mais PDFs de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
+</header>
+<main>
+  <div id="drop">
+    <div>📄 <strong>Clique para escolher</strong> ou arraste os PDFs aqui</div>
+    <input id="input" type="file" accept="application/pdf" multiple hidden>
+    <div id="files"></div>
+  </div>
+
+  <div class="toolbar">
+    <button id="go" disabled>Gerar relatório</button>
+    <button id="txt" class="secondary" disabled>Baixar .txt</button>
+    <button id="csv" class="secondary" disabled>Baixar .csv</button>
+    <button id="clear" class="secondary">Limpar</button>
+  </div>
+  <div id="status"></div>
+  <div id="report"></div>
+</main>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const TIPOS = ["SHOPEE","RAPIDA","TIKTOK","OUTROS"];
+const LABELS = {SHOPEE:"Shopee", RAPIDA:"Entrega Rápida", TIKTOK:"TikTok", OUTROS:"Outros"};
+
+// --- mesmas regras do script Python ---
+const LINE_RE = /^\s*1\s*\.\s*(.+?)\s*(?:\(\s*\*\s*(\d+)\s*\)|\*\s*(\d+))\s*$/;
+const PROD_VAR_RE = /^(.+?)\((.+)\)\s*$/;
+const RAPIDA_RE = /ENTREGA\s+RAPIDA/i;
+
+const stripAccents = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"");
+
+function classify(pageText){
+  const norm = stripAccents(pageText);
+  const temDanfe = norm.includes("DANFE SIMPLIFICADO");
+  const temHs3d  = pageText.includes("HS3DLab");
+  const temHslab = /\bHSLab\b/.test(pageText);
+  const m = pageText.match(/Pedido:\s*(\S+)/);
+  const pedidoNum = m ? /^\d{15}$/.test(m[1]) : false;
+  if (RAPIDA_RE.test(norm)) return "RAPIDA";            // testar antes (tbm tem DANFE)
+  if (temHslab && pedidoNum && !temDanfe) return "TIKTOK";
+  if (temDanfe && temHs3d) return "SHOPEE";
+  return "OUTROS";
+}
+
+function parseItem(lines){
+  for(const ln of lines){
+    const m = ln.match(LINE_RE);
+    if(!m) continue;
+    const desc = m[1].replace(/\s{2,}/g," ").trim();
+    const qty = parseInt(m[2] || m[3], 10);
+    const pv = desc.match(PROD_VAR_RE);
+    if(pv) return {prod:pv[1].trim(), varia:pv[2].trim(), qty};
+    return {prod:desc, varia:"(sem variação)", qty};
+  }
+  return null;
+}
+
+// Reconstrói linhas de uma página a partir dos itens posicionados do PDF.js
+function buildLines(textContent){
+  const items = textContent.items
+    .filter(it => it.str !== undefined)
+    .map(it => ({x: it.transform[4], y: it.transform[5], s: it.str}));
+  items.sort((a,b) => (b.y - a.y) || (a.x - b.x));
+  const lines = [];
+  let cur = null;
+  for(const it of items){
+    if(!cur || Math.abs(it.y - cur.y) > 3){
+      cur = {y: it.y, parts: [it]};
+      lines.push(cur);
+    } else {
+      cur.parts.push(it);
+    }
+  }
+  return lines.map(l => {
+    l.parts.sort((a,b) => a.x - b.x);
+    return l.parts.map(p => p.s).join(" ").replace(/\s+/g," ").trim();
+  });
+}
+
+// --- estado / agregação ---
+let selectedFiles = [];
+let resultado = null;
+
+function novoAgg(){
+  const d = {};
+  TIPOS.forEach(t => d[t] = {map:new Map(), pecas:0, etiquetas:0});
+  return d;
+}
+
+async function processar(){
+  const data = novoAgg();
+  for(let f=0; f<selectedFiles.length; f++){
+    const file = selectedFiles[f];
+    setStatus(`Lendo ${file.name} (${f+1}/${selectedFiles.length})…`);
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const lines = buildLines(tc);
+      const pageText = lines.join("\n");
+      const item = parseItem(lines);
+      if(!item) continue;
+      const tipo = classify(pageText);
+      const key = item.prod + " ||| " + item.varia;
+      const bucket = data[tipo];
+      const cur = bucket.map.get(key) || {prod:item.prod, varia:item.varia, qty:0};
+      cur.qty += item.qty;
+      bucket.map.set(key, cur);
+      bucket.pecas += item.qty;
+      bucket.etiquetas += 1;
+      if(p % 25 === 0) setStatus(`${file.name}: página ${p}/${pdf.numPages}…`);
+    }
+  }
+  return data;
+}
+
+function ordenar(map){
+  return [...map.values()].sort((a,b) =>
+    b.qty - a.qty || a.prod.localeCompare(b.prod) || a.varia.localeCompare(b.varia));
+}
+
+function render(data){
+  const totEtq = TIPOS.reduce((s,t)=>s+data[t].etiquetas,0);
+  const totPec = TIPOS.reduce((s,t)=>s+data[t].pecas,0);
+
+  let html = '<div class="summary">';
+  const chip = (cls,t) => `<div class="chip ${cls}"><div class="t">${LABELS[t]}</div>
+      <div class="n">${data[t].pecas}</div>
+      <div class="s">${data[t].etiquetas} etiquetas · ${data[t].map.size} itens</div></div>`;
+  html += chip("shopee","SHOPEE") + chip("rapida","RAPIDA") + chip("tiktok","TIKTOK");
+  html += `<div class="chip total"><div class="t">Total</div><div class="n">${totPec}</div>
+      <div class="s">${totEtq} etiquetas</div></div></div>`;
+
+  if(data.OUTROS.etiquetas){
+    html += `<div class="warn">⚠️ ${data.OUTROS.etiquetas} etiqueta(s) caíram em
+      <b>Outros</b> (não casaram com nenhuma regra). Confira o logo no PDF.</div>`;
+  }
+
+  const classOf = {SHOPEE:"shopee",RAPIDA:"rapida",TIKTOK:"tiktok",OUTROS:"outros"};
+  for(const t of TIPOS){
+    const b = data[t];
+    if(t === "OUTROS" && b.etiquetas === 0) continue;
+    html += `<section class="tipo ${classOf[t]}">
+      <h2>${LABELS[t]} <small>— ${b.pecas} peças · ${b.etiquetas} etiquetas · ${b.map.size} itens</small></h2>
+      <table><thead><tr><th class="qty">Qtd</th><th>Produto</th><th>Variação</th></tr></thead><tbody>`;
+    const rows = ordenar(b.map);
+    if(rows.length === 0){
+      html += `<tr class="empty"><td colspan="3">nenhuma etiqueta deste tipo</td></tr>`;
+    } else {
+      for(const r of rows){
+        html += `<tr><td class="qty">${r.qty}</td><td>${esc(r.prod)}</td><td>${esc(r.varia)}</td></tr>`;
+      }
+    }
+    html += `</tbody></table></section>`;
+  }
+  document.getElementById("report").innerHTML = html;
+}
+
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// --- TXT / CSV (mesmo formato do script) ---
+function gerarTXT(data){
+  const L = [];
+  L.push("=".repeat(60));
+  L.push("RELATORIO DE PRODUCAO POR TIPO (Shopee / Rapida / TikTok)");
+  L.push("=".repeat(60));
+  L.push("Arquivos analisados:");
+  selectedFiles.forEach(f => L.push("  - " + f.name));
+  for(const t of TIPOS){
+    const b = data[t];
+    L.push(""); L.push("#".repeat(60)); L.push("# " + t); L.push("#".repeat(60));
+    if(b.map.size === 0){ L.push("  (nenhuma etiqueta deste tipo)"); continue; }
+    L.push("  QTD  PRODUTO - VARIACAO"); L.push("-".repeat(60));
+    for(const r of ordenar(b.map))
+      L.push(String(r.qty).padStart(5) + "  " + r.prod + " - " + r.varia);
+    L.push("-".repeat(60));
+    L.push(`  Itens distintos: ${b.map.size} | Etiquetas: ${b.etiquetas} | Pecas: ${b.pecas}`);
+  }
+  const totEtq = TIPOS.reduce((s,t)=>s+data[t].etiquetas,0);
+  const totPec = TIPOS.reduce((s,t)=>s+data[t].pecas,0);
+  L.push(""); L.push("=".repeat(60)); L.push("RESUMO GERAL"); L.push("-".repeat(60));
+  for(const t of TIPOS)
+    L.push(`  ${t.padEnd(8)}: ${String(data[t].etiquetas).padStart(4)} etiquetas | ${String(data[t].pecas).padStart(4)} pecas`);
+  L.push(`  ${"TOTAL".padEnd(8)}: ${String(totEtq).padStart(4)} etiquetas | ${String(totPec).padStart(4)} pecas`);
+  L.push("=".repeat(60));
+  return L.join("\n") + "\n";
+}
+
+function gerarCSV(data){
+  const rows = [["tipo","produto","variacao","quantidade"]];
+  for(const t of TIPOS)
+    for(const r of ordenar(data[t].map))
+      rows.push([LABELS[t], r.prod, r.varia, r.qty]);
+  return rows.map(r => r.map(c => {
+    const v = String(c);
+    return /[",;\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+  }).join(";")).join("\n");
+}
+
+function baixar(nome, conteudo, tipo){
+  const blob = new Blob([conteudo], {type: tipo});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- UI ---
+const drop = document.getElementById("drop");
+const input = document.getElementById("input");
+const filesEl = document.getElementById("files");
+const goBtn = document.getElementById("go");
+const txtBtn = document.getElementById("txt");
+const csvBtn = document.getElementById("csv");
+const clearBtn = document.getElementById("clear");
+
+function setStatus(s){ document.getElementById("status").textContent = s; }
+function setFiles(list){
+  selectedFiles = [...list].filter(f => f.name.toLowerCase().endsWith(".pdf"));
+  filesEl.textContent = selectedFiles.length
+    ? selectedFiles.map(f => f.name).join("  •  ")
+    : "";
+  goBtn.disabled = selectedFiles.length === 0;
+}
+
+drop.addEventListener("click", () => input.click());
+input.addEventListener("change", e => setFiles(e.target.files));
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("hover");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("hover");
+}));
+drop.addEventListener("drop", e => setFiles(e.dataTransfer.files));
+
+goBtn.addEventListener("click", async () => {
+  goBtn.disabled = true; txtBtn.disabled = csvBtn.disabled = true;
+  document.getElementById("report").innerHTML = "";
+  try{
+    resultado = await processar();
+    render(resultado);
+    setStatus("✅ Relatório gerado.");
+    txtBtn.disabled = csvBtn.disabled = false;
+  }catch(err){
+    setStatus("Erro: " + err.message);
+    console.error(err);
+  }finally{
+    goBtn.disabled = false;
+  }
+});
+
+txtBtn.addEventListener("click", () => baixar("relatorio_producao.txt", gerarTXT(resultado), "text/plain"));
+csvBtn.addEventListener("click", () => baixar("relatorio_producao.csv", gerarCSV(resultado), "text/csv"));
+clearBtn.addEventListener("click", () => {
+  setFiles([]); resultado = null; setStatus("");
+  document.getElementById("report").innerHTML = "";
+  txtBtn.disabled = csvBtn.disabled = true;
+});
+</script>
+</body>
+</html>
