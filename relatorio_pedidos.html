@@ -52,12 +52,34 @@
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
   .warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:10px 14px;
         border-radius:8px;font-size:13px;margin:12px 0}
+  .urlbox{margin-top:14px}
+  .urlbox label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .urlbox textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;
+       font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical}
+  .sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:14px 0}
+  .sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--line)}
+  td.sel,th.sel{width:38px;text-align:center}
+  td.sel input{width:16px;height:16px;cursor:pointer}
+  tr.checked{background:#eff6ff}
+  tr.subhdr td{background:#f3f4f6;border-top:2px solid #d1d5db;font-size:14px}
+  tr.subhdr b{font-size:14px}
+  tr.subhdr .cnt{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
+  tr.item td.varia{padding-left:30px;color:#374151}
+  .floatbar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+    background:#111827;color:#fff;padding:12px 22px;border-radius:999px;
+    box-shadow:0 10px 30px rgba(0,0,0,.28);display:none;align-items:center;gap:18px;
+    font-size:14px;z-index:1000}
+  .floatbar.show{display:flex}
+  .floatbar .big{font-size:22px;font-weight:700}
+  .floatbar .big small{font-size:13px;font-weight:400;opacity:.8}
+  .floatbar button{background:#374151;color:#fff;padding:7px 14px;font-size:13px;border-radius:8px}
+  #report{padding-bottom:90px}
 </style>
 </head>
 <body>
 <header>
   <h1>Relatório de Produção por Tipo</h1>
-  <p>Importe um ou mais PDFs de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
+  <p>Importe PDFs (arquivos ou link) de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
 </header>
 <main>
   <div id="drop">
@@ -66,8 +88,17 @@
     <div id="files"></div>
   </div>
 
+  <div class="sep">ou</div>
+
+  <div class="urlbox">
+    <label for="urls">Cole um ou mais links (um por linha): link direto <code>.pdf</code>, pasta do GitHub, ou página com lista de PDFs</label>
+    <textarea id="urls" rows="3" placeholder="https://servidor.com/etiquetas/lote1.pdf
+https://github.com/usuario/repositorio/tree/main/pdfs"></textarea>
+  </div>
+
   <div class="toolbar">
-    <button id="go" disabled>Gerar relatório</button>
+    <button id="go" disabled>Gerar dos arquivos</button>
+    <button id="goUrl">Gerar do(s) link(s)</button>
     <button id="txt" class="secondary" disabled>Baixar .txt</button>
     <button id="csv" class="secondary" disabled>Baixar .csv</button>
     <button id="clear" class="secondary">Limpar</button>
@@ -75,6 +106,8 @@
   <div id="status"></div>
   <div id="report"></div>
 </main>
+
+<div id="floatbar" class="floatbar"></div>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -116,6 +149,29 @@ function parseItem(lines){
   return null;
 }
 
+// A variação pode embutir um multiplicador: "x,descrição" ou "descrição,x" (x = número).
+// Ex.: "Honda,4" -> 4 | "2,Preto" -> 2 | "1,Aleatorio" -> 1 | "Bob Esponja,P" -> 1
+function multiplicadorVariacao(varia){
+  const partes = varia.split(",").map(s => s.trim());
+  if(partes.length >= 2){
+    if(/^\d+$/.test(partes[0])) return parseInt(partes[0], 10);
+    const ult = partes[partes.length - 1];
+    if(/^\d+$/.test(ult)) return parseInt(ult, 10);
+  }
+  return 1;
+}
+
+// Descrição da variação SEM o número multiplicador, para agrupar.
+// Ex.: "Honda,1"/"Honda,3" -> "Honda" | "2,Preto"/"1,Preto" -> "Preto" | "Bob Esponja,P" -> "Bob Esponja,P"
+function descricaoVariacao(varia){
+  const partes = varia.split(",").map(s => s.trim());
+  if(partes.length >= 2){
+    if(/^\d+$/.test(partes[0])) return partes.slice(1).join(", ");
+    if(/^\d+$/.test(partes[partes.length - 1])) return partes.slice(0, -1).join(", ");
+  }
+  return varia.trim();
+}
+
 // Reconstrói linhas de uma página a partir dos itens posicionados do PDF.js
 function buildLines(textContent){
   const items = textContent.items
@@ -139,7 +195,8 @@ function buildLines(textContent){
 }
 
 // --- estado / agregação ---
-let selectedFiles = [];
+let selectedFiles = [];   // File[] do seletor/arrastar
+let sourceNames = [];     // nomes das fontes processadas (p/ relatório)
 let resultado = null;
 
 function novoAgg(){
@@ -148,12 +205,14 @@ function novoAgg(){
   return d;
 }
 
-async function processar(){
+// sources: [{name, load: async () => ArrayBuffer}]
+async function processar(sources){
   const data = novoAgg();
-  for(let f=0; f<selectedFiles.length; f++){
-    const file = selectedFiles[f];
-    setStatus(`Lendo ${file.name} (${f+1}/${selectedFiles.length})…`);
-    const buf = await file.arrayBuffer();
+  sourceNames = sources.map(s => s.name);
+  for(let f=0; f<sources.length; f++){
+    const src = sources[f];
+    setStatus(`Lendo ${src.name} (${f+1}/${sources.length})…`);
+    const buf = await src.load();
     const pdf = await pdfjsLib.getDocument({data: buf}).promise;
     for(let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
@@ -163,14 +222,16 @@ async function processar(){
       const item = parseItem(lines);
       if(!item) continue;
       const tipo = classify(pageText);
-      const key = item.prod + " ||| " + item.varia;
+      const add = item.qty * multiplicadorVariacao(item.varia);  // multiplicador da variação
+      const desc = descricaoVariacao(item.varia);                // agrupa pela descrição
+      const key = item.prod + " ||| " + desc;
       const bucket = data[tipo];
-      const cur = bucket.map.get(key) || {prod:item.prod, varia:item.varia, qty:0};
-      cur.qty += item.qty;
+      const cur = bucket.map.get(key) || {prod:item.prod, varia:desc, qty:0};
+      cur.qty += add;
       bucket.map.set(key, cur);
-      bucket.pecas += item.qty;
+      bucket.pecas += add;
       bucket.etiquetas += 1;
-      if(p % 25 === 0) setStatus(`${file.name}: página ${p}/${pdf.numPages}…`);
+      if(p % 25 === 0) setStatus(`${src.name}: página ${p}/${pdf.numPages}…`);
     }
   }
   return data;
@@ -199,26 +260,96 @@ function render(data){
   }
 
   const classOf = {SHOPEE:"shopee",RAPIDA:"rapida",TIKTOK:"tiktok",OUTROS:"outros"};
+  let gi = 0;   // índice global de subgrupo (p/ selecionar grupo inteiro)
   for(const t of TIPOS){
     const b = data[t];
     if(t === "OUTROS" && b.etiquetas === 0) continue;
+    const grupos = agruparPorProduto(b.map);
     html += `<section class="tipo ${classOf[t]}">
-      <h2>${LABELS[t]} <small>— ${b.pecas} peças · ${b.etiquetas} etiquetas · ${b.map.size} itens</small></h2>
-      <table><thead><tr><th class="qty">Qtd</th><th>Produto</th><th>Variação</th></tr></thead><tbody>`;
-    const rows = ordenar(b.map);
-    if(rows.length === 0){
+      <h2>${LABELS[t]} <small>— ${b.pecas} peças · ${b.etiquetas} etiquetas · ${grupos.length} produtos</small></h2>
+      <table><thead><tr><th class="sel"></th><th class="qty">Qtd</th><th>Produto / Variação</th></tr></thead><tbody>`;
+    if(grupos.length === 0){
       html += `<tr class="empty"><td colspan="3">nenhuma etiqueta deste tipo</td></tr>`;
     } else {
-      for(const r of rows){
-        html += `<tr><td class="qty">${r.qty}</td><td>${esc(r.prod)}</td><td>${esc(r.varia)}</td></tr>`;
+      for(const g of grupos){
+        const gid = gi++;
+        html += `<tr class="subhdr"><td class="sel"><input type="checkbox" class="sel-group" data-g="${gid}" title="Selecionar grupo"></td>` +
+          `<td class="qty">${g.total}</td><td><b>${esc(g.prod)}</b><span class="cnt">${g.items.length} variação(ões)</span></td></tr>`;
+        for(const r of g.items){
+          html += `<tr class="item"><td class="sel"><input type="checkbox" class="sel-item" data-g="${gid}" data-qty="${r.qty}"></td>` +
+            `<td class="qty">${r.qty}</td><td class="varia">${esc(r.varia)}</td></tr>`;
+        }
       }
     }
     html += `</tbody></table></section>`;
   }
   document.getElementById("report").innerHTML = html;
+  atualizarBarra();   // some/reseta o menu flutuante ao re-renderizar
+}
+
+// Agrupa o Map de itens por produto -> [{prod, total, items:[{varia,qty}]}]
+function agruparPorProduto(map){
+  const porProd = new Map();
+  for(const r of map.values()){
+    const g = porProd.get(r.prod) || {prod:r.prod, total:0, items:[]};
+    g.items.push({varia:r.varia, qty:r.qty});
+    g.total += r.qty;
+    porProd.set(r.prod, g);
+  }
+  const grupos = [...porProd.values()];
+  grupos.forEach(g => g.items.sort((a,b) => b.qty - a.qty || a.varia.localeCompare(b.varia)));
+  grupos.sort((a,b) => b.total - a.total || a.prod.localeCompare(b.prod));
+  return grupos;
 }
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// --- Menu flutuante: soma das quantidades dos itens selecionados ---
+function atualizarBarra(){
+  const bar = document.getElementById("floatbar");
+  const marcados = document.querySelectorAll("#report .sel-item:checked");
+  // realça as linhas marcadas
+  document.querySelectorAll("#report tr.checked").forEach(tr => tr.classList.remove("checked"));
+  marcados.forEach(c => c.closest("tr").classList.add("checked"));
+
+  if(marcados.length === 0){ bar.classList.remove("show"); bar.innerHTML = ""; return; }
+  let soma = 0;
+  marcados.forEach(c => soma += parseInt(c.dataset.qty, 10));
+  bar.innerHTML =
+    `<span><b>${marcados.length}</b> item(ns) selecionado(s)</span>` +
+    `<span class="big">${soma} <small>peças</small></span>` +
+    `<button id="limparSel">Limpar seleção</button>`;
+  bar.classList.add("show");
+  document.getElementById("limparSel").onclick = () => {
+    document.querySelectorAll("#report .sel-item:checked").forEach(c => c.checked = false);
+    document.querySelectorAll("#report .sel-group").forEach(c => { c.checked = false; c.indeterminate = false; });
+    atualizarBarra();
+  };
+}
+
+// sincroniza o checkbox do grupo com o estado das suas variações
+function sincronizarGrupo(g){
+  const header = document.querySelector(`#report .sel-group[data-g="${g}"]`);
+  if(!header) return;
+  const itens = [...document.querySelectorAll(`#report .sel-item[data-g="${g}"]`)];
+  const marcados = itens.filter(c => c.checked).length;
+  header.checked = marcados === itens.length && itens.length > 0;
+  header.indeterminate = marcados > 0 && marcados < itens.length;
+}
+
+// delegação: checkboxes (item ou grupo) atualizam a barra
+document.getElementById("report").addEventListener("change", e => {
+  if(e.target.classList.contains("sel-group")){
+    const g = e.target.dataset.g;
+    document.querySelectorAll(`#report .sel-item[data-g="${g}"]`)
+      .forEach(c => c.checked = e.target.checked);
+    e.target.indeterminate = false;
+    atualizarBarra();
+  } else if(e.target.classList.contains("sel-item")){
+    sincronizarGrupo(e.target.dataset.g);
+    atualizarBarra();
+  }
+});
 
 // --- TXT / CSV (mesmo formato do script) ---
 function gerarTXT(data){
@@ -227,7 +358,7 @@ function gerarTXT(data){
   L.push("RELATORIO DE PRODUCAO POR TIPO (Shopee / Rapida / TikTok)");
   L.push("=".repeat(60));
   L.push("Arquivos analisados:");
-  selectedFiles.forEach(f => L.push("  - " + f.name));
+  sourceNames.forEach(n => L.push("  - " + n));
   for(const t of TIPOS){
     const b = data[t];
     L.push(""); L.push("#".repeat(60)); L.push("# " + t); L.push("#".repeat(60));
@@ -268,11 +399,50 @@ function baixar(nome, conteudo, tipo){
   URL.revokeObjectURL(a.href);
 }
 
+// --- Resolução de links em URLs de PDF ---
+const ehPdf = u => /\.pdf(\?.*)?$/i.test(u);
+function nomeDeUrl(u){
+  try{ return decodeURIComponent(new URL(u).pathname.split("/").pop()) || u; }
+  catch{ return u; }
+}
+
+async function listarGitHub(owner, repo, branch, path){
+  const base = `https://api.github.com/repos/${owner}/${repo}/contents`;
+  const api = path ? `${base}/${path}?ref=${branch}` : `${base}?ref=${branch}`;
+  const r = await fetch(api);
+  if(!r.ok) throw new Error(`GitHub API HTTP ${r.status} (${api})`);
+  const arr = await r.json();
+  if(!Array.isArray(arr)) throw new Error("O link do GitHub não aponta para uma pasta.");
+  return arr.filter(x => x.type === "file" && ehPdf(x.name)).map(x => x.download_url);
+}
+
+// Recebe uma linha (URL) e devolve uma lista de URLs de PDF
+async function resolverLink(line){
+  // Pasta do GitHub: .../tree/<branch>[/<path>]
+  const gh = line.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)(?:\/(.+))?\/?$/);
+  if(gh){
+    const [, owner, repo, branch, path = ""] = gh;
+    return listarGitHub(owner, repo, branch, path.replace(/\/$/, ""));
+  }
+  // Link direto para um PDF
+  if(ehPdf(line)) return [line];
+  // Caso geral: tenta abrir como página HTML e extrair links .pdf
+  const r = await fetch(line);
+  if(!r.ok) throw new Error(`HTTP ${r.status} em ${line}`);
+  const html = await r.text();
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const hrefs = [...doc.querySelectorAll("a[href]")].map(a => a.getAttribute("href"));
+  const pdfs = hrefs.filter(ehPdf).map(h => { try{ return new URL(h, line).href; }catch{ return null; } });
+  return [...new Set(pdfs.filter(Boolean))];
+}
+
 // --- UI ---
 const drop = document.getElementById("drop");
 const input = document.getElementById("input");
 const filesEl = document.getElementById("files");
+const urlsEl = document.getElementById("urls");
 const goBtn = document.getElementById("go");
+const goUrlBtn = document.getElementById("goUrl");
 const txtBtn = document.getElementById("txt");
 const csvBtn = document.getElementById("csv");
 const clearBtn = document.getElementById("clear");
@@ -296,28 +466,60 @@ input.addEventListener("change", e => setFiles(e.target.files));
 }));
 drop.addEventListener("drop", e => setFiles(e.dataTransfer.files));
 
-goBtn.addEventListener("click", async () => {
-  goBtn.disabled = true; txtBtn.disabled = csvBtn.disabled = true;
+// Executa a análise sobre uma lista de fontes [{name, load}]
+async function run(sources){
+  goBtn.disabled = true; goUrlBtn.disabled = true; txtBtn.disabled = csvBtn.disabled = true;
   document.getElementById("report").innerHTML = "";
   try{
-    resultado = await processar();
+    if(!sources.length){ setStatus("Nada para processar."); return; }
+    resultado = await processar(sources);
     render(resultado);
-    setStatus("✅ Relatório gerado.");
+    setStatus(`✅ Relatório gerado de ${sources.length} arquivo(s).`);
     txtBtn.disabled = csvBtn.disabled = false;
   }catch(err){
     setStatus("Erro: " + err.message);
     console.error(err);
   }finally{
-    goBtn.disabled = false;
+    goBtn.disabled = selectedFiles.length === 0; goUrlBtn.disabled = false;
   }
+}
+
+goBtn.addEventListener("click", () =>
+  run(selectedFiles.map(file => ({ name: file.name, load: () => file.arrayBuffer() }))));
+
+goUrlBtn.addEventListener("click", async () => {
+  const linhas = urlsEl.value.split("\n").map(s => s.trim()).filter(Boolean);
+  if(!linhas.length){ setStatus("Cole ao menos um link."); return; }
+  goUrlBtn.disabled = true; setStatus("Resolvendo links…");
+  let urls = [];
+  try{
+    for(const linha of linhas) urls.push(...await resolverLink(linha));
+  }catch(err){
+    setStatus("Erro ao resolver link: " + err.message +
+      "  (o servidor pode bloquear acesso externo — CORS).");
+    goUrlBtn.disabled = false; return;
+  }
+  urls = [...new Set(urls)];
+  if(!urls.length){ setStatus("Nenhum PDF encontrado nos links informados."); goUrlBtn.disabled = false; return; }
+  setStatus(`${urls.length} PDF(s) encontrado(s). Baixando…`);
+  const sources = urls.map(u => ({
+    name: nomeDeUrl(u),
+    load: async () => {
+      const r = await fetch(u);
+      if(!r.ok) throw new Error(`HTTP ${r.status} ao baixar ${u}`);
+      return await r.arrayBuffer();
+    }
+  }));
+  run(sources);
 });
 
 txtBtn.addEventListener("click", () => baixar("relatorio_producao.txt", gerarTXT(resultado), "text/plain"));
 csvBtn.addEventListener("click", () => baixar("relatorio_producao.csv", gerarCSV(resultado), "text/csv"));
 clearBtn.addEventListener("click", () => {
-  setFiles([]); resultado = null; setStatus("");
+  setFiles([]); urlsEl.value = ""; resultado = null; setStatus("");
   document.getElementById("report").innerHTML = "";
   txtBtn.disabled = csvBtn.disabled = true;
+  atualizarBarra();
 });
 </script>
 </body>
