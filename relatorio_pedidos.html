@@ -224,10 +224,12 @@ async function processar(sources){
       const tipo = classify(pageText);
       const add = item.qty * multiplicadorVariacao(item.varia);  // multiplicador da variação
       const desc = descricaoVariacao(item.varia);                // agrupa pela descrição
+      const ped = (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)";
       const key = item.prod + " ||| " + desc;
       const bucket = data[tipo];
-      const cur = bucket.map.get(key) || {prod:item.prod, varia:desc, qty:0};
+      const cur = bucket.map.get(key) || {prod:item.prod, varia:desc, qty:0, pedidos:[]};
       cur.qty += add;
+      cur.pedidos.push({pedido:ped, q:add});
       bucket.map.set(key, cur);
       bucket.pecas += add;
       bucket.etiquetas += 1;
@@ -273,10 +275,10 @@ function render(data){
     } else {
       for(const g of grupos){
         const gid = gi++;
-        html += `<tr class="subhdr"><td class="sel"><input type="checkbox" class="sel-group" data-g="${gid}" title="Selecionar grupo"></td>` +
+        html += `<tr class="subhdr" title="${escAttr(tooltipPedidos(g.pedidos))}"><td class="sel"><input type="checkbox" class="sel-group" data-g="${gid}" title="Selecionar grupo"></td>` +
           `<td class="qty">${g.total}</td><td><b>${esc(g.prod)}</b><span class="cnt">${g.items.length} variação(ões)</span></td></tr>`;
         for(const r of g.items){
-          html += `<tr class="item"><td class="sel"><input type="checkbox" class="sel-item" data-g="${gid}" data-qty="${r.qty}"></td>` +
+          html += `<tr class="item" title="${escAttr(tooltipPedidos(r.pedidos))}"><td class="sel"><input type="checkbox" class="sel-item" data-g="${gid}" data-qty="${r.qty}"></td>` +
             `<td class="qty">${r.qty}</td><td class="varia">${esc(r.varia)}</td></tr>`;
         }
       }
@@ -291,9 +293,10 @@ function render(data){
 function agruparPorProduto(map){
   const porProd = new Map();
   for(const r of map.values()){
-    const g = porProd.get(r.prod) || {prod:r.prod, total:0, items:[]};
-    g.items.push({varia:r.varia, qty:r.qty});
+    const g = porProd.get(r.prod) || {prod:r.prod, total:0, items:[], pedidos:[]};
+    g.items.push({varia:r.varia, qty:r.qty, pedidos:r.pedidos});
     g.total += r.qty;
+    g.pedidos = g.pedidos.concat(r.pedidos);
     porProd.set(r.prod, g);
   }
   const grupos = [...porProd.values()];
@@ -301,6 +304,15 @@ function agruparPorProduto(map){
   grupos.sort((a,b) => b.total - a.total || a.prod.localeCompare(b.prod));
   return grupos;
 }
+
+// Monta o texto do tooltip com os pedidos que compõem a soma
+function tooltipPedidos(lista){
+  const m = new Map();
+  for(const p of lista) m.set(p.pedido, (m.get(p.pedido) || 0) + p.q);
+  const arr = [...m.entries()].map(([ped, q]) => q > 1 ? `${ped} (×${q})` : ped);
+  return `Pedidos (${arr.length}):\n` + arr.join("\n");
+}
+const escAttr = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
