@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Relatório de Produção — Shopee / Rápida / TikTok</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --shopee:#ee4d2d; --rapida:#2563eb; --tiktok:#111; --bg:#f5f6f8; --card:#fff;
@@ -13,9 +14,12 @@
   *{box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
        margin:0;background:var(--bg);color:var(--txt)}
-  header{background:#111827;color:#fff;padding:20px 24px}
+  header{background:#111827;color:#fff;padding:20px 24px;
+         display:flex;justify-content:space-between;align-items:center;gap:16px}
   header h1{margin:0;font-size:20px}
   header p{margin:4px 0 0;color:#9ca3af;font-size:13px}
+  .btn-danger{background:#dc2626;color:#fff;white-space:nowrap}
+  .btn-danger:hover{background:#b91c1c}
   main{max-width:1000px;margin:0 auto;padding:24px}
   #drop{border:2px dashed #9ca3af;border-radius:12px;background:var(--card);
         padding:40px;text-align:center;cursor:pointer;transition:.15s}
@@ -58,28 +62,55 @@
        font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical}
   .sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:14px 0}
   .sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--line)}
-  td.sel,th.sel{width:38px;text-align:center}
-  td.sel input{width:16px;height:16px;cursor:pointer}
-  tr.checked{background:#eff6ff}
+  td.sel,th.sel{width:92px;text-align:center}
+  th.sel{font-size:11px}
+  td.sel input{width:70px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;
+       font-size:13px;text-align:center}
+  tr.low{background:#fef9c3}                 /* estoque < total */
+  tr.ok{background:#dcfce7}                  /* estoque >= total */
+  tr.low td.estq input,tr.ok td.estq input{border-color:rgba(0,0,0,.15)}
   tr.subhdr td{background:#f3f4f6;border-top:2px solid #d1d5db;font-size:14px}
   tr.subhdr b{font-size:14px}
   tr.subhdr .cnt{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
   tr.item td.varia{padding-left:30px;color:#374151}
-  .floatbar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
-    background:#111827;color:#fff;padding:12px 22px;border-radius:999px;
-    box-shadow:0 10px 30px rgba(0,0,0,.28);display:none;align-items:center;gap:18px;
-    font-size:14px;z-index:1000}
-  .floatbar.show{display:flex}
-  .floatbar .big{font-size:22px;font-weight:700}
-  .floatbar .big small{font-size:13px;font-weight:400;opacity:.8}
-  .floatbar button{background:#374151;color:#fff;padding:7px 14px;font-size:13px;border-radius:8px}
-  #report{padding-bottom:90px}
+  .pin{background:transparent;border:0;padding:2px 6px;margin-left:8px;font-size:14px;
+       cursor:pointer;border-radius:6px;opacity:.55;line-height:1}
+  .pin:hover{background:#e5e7eb;opacity:1}
+  .pin.active{opacity:1;background:#fde68a}
+  .pinned{position:fixed;top:16px;right:16px;width:290px;max-height:calc(100vh - 32px);
+    overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 12px 34px rgba(0,0,0,.20);display:none;z-index:1000;font-size:13px}
+  .pinned.show{display:block}
+  .pinned-hd{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;
+    border-bottom:1px solid var(--line);font-weight:700;background:#111827;color:#fff;
+    position:sticky;top:0}
+  .pinned-hd button{background:#374151;color:#fff;padding:4px 9px;font-size:12px;border-radius:6px}
+  .pcard{border-bottom:1px solid var(--line);padding:8px 12px}
+  .pcard-hd{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .pcard-hd b{flex:1}
+  .pcard-hd .ptot{font-weight:700}
+  .pcard-hd .unpin{background:transparent;color:#9ca3af;border:0;cursor:pointer;font-size:14px;padding:2px 4px}
+  .pcard-hd .unpin:hover{color:#ef4444}
+  .porigem{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:5px}
+  .porigem .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .porigem .dot.shopee{background:var(--shopee)}
+  .porigem .dot.rapida{background:var(--rapida)}
+  .porigem .dot.tiktok{background:var(--tiktok)}
+  .porigem .dot.outros{background:#9333ea}
+  .prow{display:flex;justify-content:space-between;gap:10px;padding:3px 6px 3px 10px;color:#374151;border-radius:5px}
+  .prow.low{background:#fef9c3}
+  .prow.ok{background:#dcfce7}
+  .prow .pq{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .prow .pq b{color:#111827}
 </style>
 </head>
 <body>
 <header>
-  <h1>Relatório de Produção por Tipo</h1>
-  <p>Importe PDFs (arquivos ou link) de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
+  <div>
+    <h1>Relatório de Produção por Tipo</h1>
+    <p>Importe PDFs (arquivos ou link) de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
+  </div>
+  <button id="wipe" class="btn-danger" title="Apaga todos os pedidos do banco (hard delete)">🗑️ Limpar dados</button>
 </header>
 <main>
   <div id="drop">
@@ -103,11 +134,12 @@ https://github.com/usuario/repositorio/tree/main/pdfs"></textarea>
     <button id="csv" class="secondary" disabled>Baixar .csv</button>
     <button id="clear" class="secondary">Limpar</button>
   </div>
+  <div id="dbstatus" class="hint"></div>
   <div id="status"></div>
   <div id="report"></div>
 </main>
 
-<div id="floatbar" class="floatbar"></div>
+<div id="pinned" class="pinned"></div>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -115,6 +147,58 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 const TIPOS = ["SHOPEE","RAPIDA","TIKTOK","OUTROS"];
 const LABELS = {SHOPEE:"Shopee", RAPIDA:"Entrega Rápida", TIKTOK:"TikTok", OUTROS:"Outros"};
+
+// ============ Supabase (banco na nuvem) ============
+// Cole abaixo a URL e a anon key do seu projeto (Supabase > Project Settings > API).
+const SUPABASE_URL = "https://upctjkyfazudvttqrysp.supabase.co";        // ex.: "https://abcd1234.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwY3Rqa3lmYXp1ZHZ0dHFyeXNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzMyMjQsImV4cCI6MjA5Njg0OTIyNH0.MhSONZDBMfbxOkTKzxip1jZ8Yy56TkYxHePtKtunCcw";   // ex.: "eyJhbGci..."
+const db = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let estoqueSalvo = {};          // "produto ||| variacao" -> quantidade (vindo do banco)
+
+// Data de hoje (local) no formato YYYY-MM-DD — o estoque é PARCIAL DIÁRIO:
+// gravado por dia e zerado automaticamente no dia seguinte (cada dia carrega só o seu).
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+// Chave do estoque: o estoque é por ENVIO (origem) + produto + variação.
+const estKey = (origem, produto, variacao) => origem + " ||| " + produto + " ||| " + variacao;
+
+async function carregarEstoque(){
+  if(!db) return {};
+  const { data, error } = await db.from("estoque")
+    .select("produto,variacao,origem,quantidade").eq("dia", hojeISO());
+  if(error){ console.error("carregarEstoque:", error); return {}; }
+  const m = {};
+  for(const r of data) m[estKey(r.origem, r.produto, r.variacao)] = r.quantidade;
+  return m;
+}
+
+const _saveTimers = {};
+function salvarEstoque(origem, produto, variacao, quantidade){
+  if(!db) return;
+  const key = estKey(origem, produto, variacao);
+  estoqueSalvo[key] = quantidade;
+  clearTimeout(_saveTimers[key]);
+  _saveTimers[key] = setTimeout(async () => {
+    const { error } = await db.from("estoque").upsert(
+      { produto, variacao, origem, dia: hojeISO(), quantidade, atualizado_em: new Date().toISOString() },
+      { onConflict: "produto,variacao,origem,dia" });
+    if(error) console.error("salvarEstoque:", error);
+  }, 500);
+}
+
+function removerEstoque(origem, produto, variacao){
+  if(!db) return;
+  const key = estKey(origem, produto, variacao);
+  delete estoqueSalvo[key];
+  clearTimeout(_saveTimers[key]);
+  db.from("estoque").delete().match({ produto, variacao, origem, dia: hojeISO() })
+    .then(({ error }) => { if(error) console.error("removerEstoque:", error); });
+}
+
 
 // --- mesmas regras do script Python ---
 const LINE_RE = /^\s*1\s*\.\s*(.+?)\s*(?:\(\s*\*\s*(\d+)\s*\)|\*\s*(\d+))\s*$/;
@@ -198,6 +282,9 @@ function buildLines(textContent){
 let selectedFiles = [];   // File[] do seletor/arrastar
 let sourceNames = [];     // nomes das fontes processadas (p/ relatório)
 let resultado = null;
+let gruposReg = {};            // gid -> {prod, total, items} (p/ o painel de fixados)
+let estoqueReg = {};           // gid -> { i: estoque } (estoque digitado por variação)
+const pinned = new Set();      // gids fixados
 
 function novoAgg(){
   const d = {};
@@ -205,10 +292,11 @@ function novoAgg(){
   return d;
 }
 
-// sources: [{name, load: async () => ArrayBuffer}]
+// Lê os PDFs e devolve uma LISTA DE LINHAS individuais (uma por etiqueta):
+// {pedido, origem, produto, varia (descrição agrupada), qty (com multiplicador)}
 async function processar(sources){
-  const data = novoAgg();
   sourceNames = sources.map(s => s.name);
+  const linhas = [];
   for(let f=0; f<sources.length; f++){
     const src = sources[f];
     setStatus(`Lendo ${src.name} (${f+1}/${sources.length})…`);
@@ -221,22 +309,94 @@ async function processar(sources){
       const pageText = lines.join("\n");
       const item = parseItem(lines);
       if(!item) continue;
-      const tipo = classify(pageText);
-      const add = item.qty * multiplicadorVariacao(item.varia);  // multiplicador da variação
-      const desc = descricaoVariacao(item.varia);                // agrupa pela descrição
-      const ped = (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)";
-      const key = item.prod + " ||| " + desc;
-      const bucket = data[tipo];
-      const cur = bucket.map.get(key) || {prod:item.prod, varia:desc, qty:0, pedidos:[]};
-      cur.qty += add;
-      cur.pedidos.push({pedido:ped, q:add});
-      bucket.map.set(key, cur);
-      bucket.pecas += add;
-      bucket.etiquetas += 1;
+      linhas.push({
+        pedido: (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)",
+        origem: classify(pageText),
+        produto: item.prod,
+        varia: descricaoVariacao(item.varia),
+        qty: item.qty * multiplicadorVariacao(item.varia)
+      });
       if(p % 25 === 0) setStatus(`${src.name}: página ${p}/${pdf.numPages}…`);
     }
   }
+  return linhas;
+}
+
+// Agrega linhas individuais na estrutura usada pelo relatório (por tipo / produto+variação)
+function agregarLinhas(linhas){
+  const data = novoAgg();
+  for(const l of linhas){
+    const b = data[l.origem] || data.OUTROS;
+    const key = l.produto + " ||| " + l.varia;
+    const cur = b.map.get(key) || {prod:l.produto, varia:l.varia, qty:0, pedidos:[]};
+    cur.qty += l.qty;
+    cur.pedidos.push({pedido:l.pedido, q:l.qty});
+    b.map.set(key, cur);
+    b.pecas += l.qty;
+    b.etiquetas += 1;
+  }
   return data;
+}
+
+// Remove as linhas cujo nº de venda (pedido) JÁ existe no banco. Retorna {novas, ignoradas}.
+async function filtrarNovas(linhas){
+  if(!db) return { novas: linhas, ignoradas: 0 };
+  const pedidos = [...new Set(linhas.map(l => l.pedido).filter(p => p && p !== "(sem nº)"))];
+  const existentes = new Set();
+  for(let i=0; i<pedidos.length; i+=200){
+    const lote = pedidos.slice(i, i+200);
+    const { data, error } = await db.from("pedidos").select("pedido").in("pedido", lote);
+    if(error) throw error;
+    data.forEach(r => existentes.add(r.pedido));
+  }
+  const novas = linhas.filter(l => !existentes.has(l.pedido));
+  return { novas, ignoradas: linhas.length - novas.length };
+}
+
+// Insere as vendas novas no banco (relatório do lote + pedidos + catálogo de produtos)
+async function inserirPedidos(novas){
+  if(!db || !novas.length) return;
+  const tot = {SHOPEE:0, RAPIDA:0, TIKTOK:0, OUTROS:0};
+  novas.forEach(l => { tot[l.origem] = (tot[l.origem] || 0) + l.qty; });
+  const { data: rel, error: e1 } = await db.from("relatorios").insert({
+    arquivos: sourceNames.join(", "),
+    etiquetas: novas.length,
+    total_geral: novas.reduce((s,l)=>s+l.qty, 0),
+    total_shopee: tot.SHOPEE, total_rapida: tot.RAPIDA, total_tiktok: tot.TIKTOK
+  }).select("id").single();
+  if(e1) throw e1;
+  const produtos = [...new Set(novas.map(l => l.produto))].map(c => ({codigo:c}));
+  await db.from("produtos").upsert(produtos, {onConflict:"codigo", ignoreDuplicates:true});
+  const rows = novas.map(l => ({
+    relatorio_id: rel.id, pedido:l.pedido, origem:l.origem,
+    produto:l.produto, variacao:l.varia, quantidade:l.qty
+  }));
+  for(let i=0; i<rows.length; i+=500){
+    const { error } = await db.from("pedidos").insert(rows.slice(i, i+500));
+    if(error) throw error;
+  }
+}
+
+// Carrega do banco todas as vendas importadas HOJE (criado_em >= meia-noite local)
+async function carregarVendasDoDia(){
+  if(!db) return [];
+  const agora = new Date();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString();
+  const linhas = [];
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("pedido,origem,produto,variacao,quantidade")
+      .gte("criado_em", inicio)
+      .order("id", { ascending: true })
+      .range(from, from + tam - 1);
+    if(error){ console.error("carregarVendasDoDia:", error); break; }
+    linhas.push(...data.map(r => ({
+      pedido: r.pedido, origem: r.origem, produto: r.produto, varia: r.variacao, qty: r.quantidade
+    })));
+    if(data.length < tam) break;
+  }
+  return linhas;
 }
 
 function ordenar(map){
@@ -262,31 +422,43 @@ function render(data){
   }
 
   const classOf = {SHOPEE:"shopee",RAPIDA:"rapida",TIKTOK:"tiktok",OUTROS:"outros"};
-  let gi = 0;   // índice global de subgrupo (p/ selecionar grupo inteiro)
+  gruposReg = {};            // reinicia registro/fixados a cada novo relatório
+  estoqueReg = {};
+  pinned.clear();
+  let gi = 0;
   for(const t of TIPOS){
     const b = data[t];
     if(t === "OUTROS" && b.etiquetas === 0) continue;
     const grupos = agruparPorProduto(b.map);
     html += `<section class="tipo ${classOf[t]}">
       <h2>${LABELS[t]} <small>— ${b.pecas} peças · ${b.etiquetas} etiquetas · ${grupos.length} produtos</small></h2>
-      <table><thead><tr><th class="sel"></th><th class="qty">Qtd</th><th>Produto / Variação</th></tr></thead><tbody>`;
+      <table><thead><tr><th class="sel">Estoque</th><th class="qty">Qtd</th><th>Produto / Variação</th></tr></thead><tbody>`;
     if(grupos.length === 0){
       html += `<tr class="empty"><td colspan="3">nenhuma etiqueta deste tipo</td></tr>`;
     } else {
       for(const g of grupos){
         const gid = gi++;
-        html += `<tr class="subhdr" title="${escAttr(tooltipPedidos(g.pedidos))}"><td class="sel"><input type="checkbox" class="sel-group" data-g="${gid}" title="Selecionar grupo"></td>` +
-          `<td class="qty">${g.total}</td><td><b>${esc(g.prod)}</b><span class="cnt">${g.items.length} variação(ões)</span></td></tr>`;
-        for(const r of g.items){
-          html += `<tr class="item" title="${escAttr(tooltipPedidos(r.pedidos))}"><td class="sel"><input type="checkbox" class="sel-item" data-g="${gid}" data-qty="${r.qty}"></td>` +
+        gruposReg[gid] = {prod:g.prod, total:g.total, items:g.items, tipo:t};
+        html += `<tr class="subhdr" title="${escAttr(tooltipPedidos(g.pedidos))}"><td class="sel"></td>` +
+          `<td class="qty">${g.total}</td><td><b>${esc(g.prod)}</b><span class="cnt">${g.items.length} variação(ões)</span>` +
+          `<button class="pin" data-g="${gid}" title="Fixar produto">📌</button></td></tr>`;
+        g.items.forEach((r, idx) => {
+          const est = estoqueSalvo[estKey(t, g.prod, r.varia)];
+          let cls = "", val = "";
+          if(est !== undefined && est !== null){
+            val = est;
+            cls = est >= r.qty ? "ok" : "low";
+            (estoqueReg[gid] = estoqueReg[gid] || {})[idx] = est;
+          }
+          html += `<tr class="item ${cls}" title="${escAttr(tooltipPedidos(r.pedidos))}"><td class="sel estq"><input type="number" min="0" class="estoque" data-g="${gid}" data-i="${idx}" data-total="${r.qty}" value="${val}" placeholder="–"></td>` +
             `<td class="qty">${r.qty}</td><td class="varia">${esc(r.varia)}</td></tr>`;
-        }
+        });
       }
     }
     html += `</tbody></table></section>`;
   }
   document.getElementById("report").innerHTML = html;
-  atualizarBarra();   // some/reseta o menu flutuante ao re-renderizar
+  renderPinned();
 }
 
 // Agrupa o Map de itens por produto -> [{prod, total, items:[{varia,qty}]}]
@@ -316,51 +488,77 @@ const escAttr = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-// --- Menu flutuante: soma das quantidades dos itens selecionados ---
-function atualizarBarra(){
-  const bar = document.getElementById("floatbar");
-  const marcados = document.querySelectorAll("#report .sel-item:checked");
-  // realça as linhas marcadas
-  document.querySelectorAll("#report tr.checked").forEach(tr => tr.classList.remove("checked"));
-  marcados.forEach(c => c.closest("tr").classList.add("checked"));
-
-  if(marcados.length === 0){ bar.classList.remove("show"); bar.innerHTML = ""; return; }
-  let soma = 0;
-  marcados.forEach(c => soma += parseInt(c.dataset.qty, 10));
-  bar.innerHTML =
-    `<span><b>${marcados.length}</b> item(ns) selecionado(s)</span>` +
-    `<span class="big">${soma} <small>peças</small></span>` +
-    `<button id="limparSel">Limpar seleção</button>`;
-  bar.classList.add("show");
-  document.getElementById("limparSel").onclick = () => {
-    document.querySelectorAll("#report .sel-item:checked").forEach(c => c.checked = false);
-    document.querySelectorAll("#report .sel-group").forEach(c => { c.checked = false; c.indeterminate = false; });
-    atualizarBarra();
-  };
-}
-
-// sincroniza o checkbox do grupo com o estado das suas variações
-function sincronizarGrupo(g){
-  const header = document.querySelector(`#report .sel-group[data-g="${g}"]`);
-  if(!header) return;
-  const itens = [...document.querySelectorAll(`#report .sel-item[data-g="${g}"]`)];
-  const marcados = itens.filter(c => c.checked).length;
-  header.checked = marcados === itens.length && itens.length > 0;
-  header.indeterminate = marcados > 0 && marcados < itens.length;
-}
-
-// delegação: checkboxes (item ou grupo) atualizam a barra
-document.getElementById("report").addEventListener("change", e => {
-  if(e.target.classList.contains("sel-group")){
-    const g = e.target.dataset.g;
-    document.querySelectorAll(`#report .sel-item[data-g="${g}"]`)
-      .forEach(c => c.checked = e.target.checked);
-    e.target.indeterminate = false;
-    atualizarBarra();
-  } else if(e.target.classList.contains("sel-item")){
-    sincronizarGrupo(e.target.dataset.g);
-    atualizarBarra();
+// --- Estoque: colore a linha conforme o estoque digitado vs o total necessário ---
+// amarelo = estoque < total | verde = estoque >= total | vazio = sem cor
+document.getElementById("report").addEventListener("input", e => {
+  if(!e.target.classList.contains("estoque")) return;
+  const tr = e.target.closest("tr");
+  tr.classList.remove("low", "ok");
+  const g = e.target.dataset.g, i = e.target.dataset.i;
+  const total = parseInt(e.target.dataset.total, 10);
+  const grp = gruposReg[g];
+  const origem = grp ? grp.tipo : null;
+  const produto = grp ? grp.prod : null;
+  const variacao = grp ? grp.items[i].varia : null;
+  const v = e.target.value.trim();
+  const n = parseInt(v, 10);
+  if(!estoqueReg[g]) estoqueReg[g] = {};
+  if(v === "" || Number.isNaN(n)){
+    delete estoqueReg[g][i];
+    if(produto) removerEstoque(origem, produto, variacao);
+  } else {
+    estoqueReg[g][i] = n;
+    tr.classList.add(n >= total ? "ok" : "low");
+    if(produto) salvarEstoque(origem, produto, variacao, n);
   }
+  if(pinned.has(g)) renderPinned();   // reflete no painel fixo
+});
+
+// --- Fixar produtos: painel fixo que continua visível no scroll ---
+function syncPinButtons(){
+  document.querySelectorAll("#report .pin").forEach(btn =>
+    btn.classList.toggle("active", pinned.has(btn.dataset.g)));
+}
+
+function renderPinned(){
+  const box = document.getElementById("pinned");
+  if(pinned.size === 0){ box.classList.remove("show"); box.innerHTML = ""; syncPinButtons(); return; }
+  let html = `<div class="pinned-hd"><span>📌 Fixados (${pinned.size})</span><button id="unpinAll">Limpar</button></div>`;
+  for(const g of pinned){
+    const grp = gruposReg[g];
+    if(!grp) continue;
+    const cls = {SHOPEE:"shopee",RAPIDA:"rapida",TIKTOK:"tiktok",OUTROS:"outros"}[grp.tipo] || "outros";
+    html += `<div class="pcard"><div class="pcard-hd"><b>${esc(grp.prod)}</b>` +
+      `<span class="ptot">${grp.total}</span><button class="unpin" data-g="${g}" title="Desafixar">✕</button></div>` +
+      `<div class="porigem"><span class="dot ${cls}"></span>Origem: ${LABELS[grp.tipo]}</div>`;
+    grp.items.forEach((it, i) => {
+      const est = estoqueReg[g] ? estoqueReg[g][i] : undefined;
+      const cls = est === undefined ? "" : (est >= it.qty ? "ok" : "low");
+      const estTxt = est === undefined ? "–" : est;
+      html += `<div class="prow ${cls}"><span>${esc(it.varia)}</span>` +
+        `<span class="pq"><b>${estTxt}</b> / ${it.qty}</span></div>`;
+    });
+    html += `</div>`;
+  }
+  box.innerHTML = html;
+  box.classList.add("show");
+  syncPinButtons();
+}
+
+// clique no 📌 dentro do relatório
+document.getElementById("report").addEventListener("click", e => {
+  const btn = e.target.closest(".pin");
+  if(!btn) return;
+  const g = btn.dataset.g;
+  if(pinned.has(g)) pinned.delete(g); else pinned.add(g);
+  renderPinned();
+});
+
+// cliques dentro do painel (desafixar 1 ou limpar tudo)
+document.getElementById("pinned").addEventListener("click", e => {
+  if(e.target.id === "unpinAll"){ pinned.clear(); renderPinned(); return; }
+  const un = e.target.closest(".unpin");
+  if(un){ pinned.delete(un.dataset.g); renderPinned(); }
 });
 
 // --- TXT / CSV (mesmo formato do script) ---
@@ -458,6 +656,28 @@ const goUrlBtn = document.getElementById("goUrl");
 const txtBtn = document.getElementById("txt");
 const csvBtn = document.getElementById("csv");
 const clearBtn = document.getElementById("clear");
+const wipeBtn = document.getElementById("wipe");
+
+// status do banco
+document.getElementById("dbstatus").textContent =
+  db ? "🟢 Banco conectado (Supabase)" : "⚪ Banco não configurado (preencha SUPABASE_URL e SUPABASE_ANON_KEY no código)";
+wipeBtn.disabled = !db;
+
+// Limpar dados: HARD DELETE de todos os pedidos
+wipeBtn.addEventListener("click", async () => {
+  if(!db){ setStatus("Banco não configurado."); return; }
+  if(!confirm("Apagar TODOS os pedidos do banco?\n\nEsta ação é PERMANENTE (hard delete) e não pode ser desfeita.")) return;
+  wipeBtn.disabled = true; setStatus("Apagando pedidos…");
+  try{
+    const { error } = await db.from("pedidos").delete().gte("id", 0);
+    if(error) throw error;
+    resultado = null;
+    document.getElementById("report").innerHTML = "";
+    txtBtn.disabled = csvBtn.disabled = true;
+    setStatus("✅ Todos os pedidos foram apagados.");
+  }catch(err){ setStatus("Erro ao apagar: " + err.message); console.error(err); }
+  finally{ wipeBtn.disabled = false; }
+});
 
 function setStatus(s){ document.getElementById("status").textContent = s; }
 function setFiles(list){
@@ -484,9 +704,16 @@ async function run(sources){
   document.getElementById("report").innerHTML = "";
   try{
     if(!sources.length){ setStatus("Nada para processar."); return; }
-    resultado = await processar(sources);
+    const linhas = await processar(sources);
+    setStatus("Verificando vendas já existentes no banco…");
+    const { novas, ignoradas } = await filtrarNovas(linhas);
+    if(db && novas.length){ setStatus(`Gravando ${novas.length} venda(s) nova(s)…`); await inserirPedidos(novas); }
+    estoqueSalvo = await carregarEstoque();   // puxa estoque do banco (se configurado)
+    resultado = agregarLinhas(novas);         // exibe só as vendas novas
     render(resultado);
-    setStatus(`✅ Relatório gerado de ${sources.length} arquivo(s).`);
+    setStatus(db
+      ? `✅ ${novas.length} venda(s) nova(s) importada(s) · ${ignoradas} ignorada(s) (já no banco).`
+      : `✅ ${linhas.length} item(ns) (banco não configurado — sem deduplicação).`);
     txtBtn.disabled = csvBtn.disabled = false;
   }catch(err){
     setStatus("Erro: " + err.message);
@@ -531,8 +758,25 @@ clearBtn.addEventListener("click", () => {
   setFiles([]); urlsEl.value = ""; resultado = null; setStatus("");
   document.getElementById("report").innerHTML = "";
   txtBtn.disabled = csvBtn.disabled = true;
-  atualizarBarra();
 });
+
+// Ao abrir a tela: mostra todas as vendas importadas hoje (do banco)
+(async function initDia(){
+  if(!db) return;
+  try{
+    setStatus("Carregando vendas de hoje…");
+    estoqueSalvo = await carregarEstoque();
+    const linhas = await carregarVendasDoDia();
+    if(linhas.length){
+      resultado = agregarLinhas(linhas);
+      render(resultado);
+      txtBtn.disabled = csvBtn.disabled = false;
+      setStatus(`📅 Vendas importadas hoje: ${linhas.length}.`);
+    } else {
+      setStatus("Nenhuma venda importada hoje ainda. Importe um arquivo ou link.");
+    }
+  }catch(err){ setStatus("Erro ao carregar vendas do dia: " + err.message); console.error(err); }
+})();
 </script>
 </body>
 </html>
