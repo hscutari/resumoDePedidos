@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Produtos — Resumo de Pedidos</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 <style>
   :root{ --rapida:#2563eb; --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --txt:#1f2937; --muted:#6b7280; }
   *{box-sizing:border-box}
@@ -55,7 +56,7 @@
       <tbody id="tbody"></tbody>
     </table>
   </div>
-  <input type="file" id="gfile" accept=".gcode,.gco,.g,.nc,.ngc,.tap" hidden>
+  <input type="file" id="gfile" accept=".gcode,.gco,.g,.nc,.ngc,.tap,.3mf" hidden>
 </main>
 
 <script>
@@ -133,6 +134,56 @@ function parseGcode(txt){
   return { segundos, pecas, modelo };
 }
 
+// Lê um .3mf (ZIP) e extrai { segundos, pecas, modelo, linhas }
+function parse3mf(buf){
+  const files = fflate.unzipSync(buf);
+  const dec = new TextDecoder();
+  const get = re => { const k = Object.keys(files).find(n => re.test(n)); return k ? dec.decode(files[k]) : null; };
+  let segundos = null, pecas = null, modelo = null, linhas = null, m;
+
+  // 1) gcode embutido (Bambu/Orca) -> reusa o parser de gcode
+  const gkey = Object.keys(files).find(n => /\.gcode$/i.test(n));
+  if(gkey){
+    const txt = dec.decode(files[gkey]);
+    linhas = txt.split(/\r\n|\r|\n/).length;
+    const g = parseGcode(txt);
+    segundos = g.segundos; pecas = g.pecas; modelo = g.modelo;
+  }
+
+  // 2) slice_info.config (Bambu/Orca) — tempo e peças
+  const slice = get(/slice_info\.config$/i);
+  if(slice){
+    if(segundos == null && (m = slice.match(/key="prediction"\s+value="(\d+)"/i))) segundos = +m[1];
+    if(pecas == null){ const objs = slice.match(/<object\b/gi); if(objs) pecas = objs.length; }
+    if(modelo == null && (m = slice.match(/key="printer_model_id"\s+value="([^"]+)"/i))) modelo = m[1];
+  }
+
+  // 3) project/model settings (JSON) — modelo da máquina
+  if(modelo == null){
+    const proj = get(/project_settings\.config$/i) || get(/model_settings\.config$/i);
+    if(proj && (m = proj.match(/"printer_model"\s*:\s*"([^"]+)"/i))) modelo = m[1];
+  }
+
+  // 4) 3mf "puro" (só modelo) — conta itens do build = peças
+  if(pecas == null){
+    const model = get(/3dmodel\.model$/i);
+    if(model){ const items = model.match(/<item\b/gi); if(items) pecas = items.length; }
+  }
+
+  return { segundos, pecas, modelo, linhas };
+}
+
+// Roteia .gcode vs .3mf
+async function lerArquivo(f){
+  if(/\.3mf$/i.test(f.name)){
+    const buf = new Uint8Array(await f.arrayBuffer());
+    return parse3mf(buf);
+  }
+  const txt = await f.text();
+  const linhas = txt.split(/\r\n|\r|\n/).length;
+  return { ...parseGcode(txt), linhas };
+}
+
 const gfile = document.getElementById("gfile");
 let produtoAlvo = null;   // código do produto cujo gcode está sendo importado
 
@@ -153,13 +204,11 @@ gfile.addEventListener("change", async () => {
   if(alvo) alvo.textContent = "Lendo…";
   const cod = produtoAlvo;
   try{
-    const txt = await f.text();
-    const linhas = txt.split(/\r\n|\r|\n/).length;
-    const { segundos, pecas, modelo } = parseGcode(txt);
+    const { segundos, pecas, modelo, linhas } = await lerArquivo(f);
     await salvarGcode(cod, { arquivo: f.name, modelo, segundos, pecas, linhas, tamanho: f.size });
     gcodeMap[cod] = { arquivo: f.name, modelo, tempo_segundos: segundos, pecas, linhas };
     renderProdutos(document.getElementById("busca").value);
-    setStatus(`✅ gcode de ${cod} salvo · 🖨 ${modelo ?? "—"} · ⏱ ${formatTempo(segundos) ?? "—"} · 🧩 ${pecas ?? "—"} peça(s).`);
+    setStatus(`✅ ${cod} salvo · 🖨 ${modelo ?? "—"} · ⏱ ${formatTempo(segundos) ?? "—"} · 🧩 ${pecas ?? "—"} peça(s).`);
   }catch(err){
     if(alvo) alvo.textContent = "Erro: " + err.message;
     setStatus("Erro ao salvar gcode: " + err.message);
