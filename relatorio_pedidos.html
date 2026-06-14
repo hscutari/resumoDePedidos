@@ -20,6 +20,10 @@
   header p{margin:4px 0 0;color:#9ca3af;font-size:13px}
   .btn-danger{background:#dc2626;color:#fff;white-space:nowrap}
   .btn-danger:hover{background:#b91c1c}
+  .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .navlink{color:#fff;background:#374151;text-decoration:none;border-radius:8px;
+           padding:10px 14px;font-size:14px;font-weight:600;white-space:nowrap}
+  .navlink:hover{background:#4b5563}
   main{max-width:1000px;margin:0 auto;padding:24px}
   #drop{border:2px dashed #9ca3af;border-radius:12px;background:var(--card);
         padding:40px;text-align:center;cursor:pointer;transition:.15s}
@@ -114,7 +118,10 @@
     <h1>Relatório de Produção por Tipo</h1>
     <p>Importe PDFs (arquivos ou link) de etiquetas — Shopee · Entrega Rápida · TikTok. Tudo roda no seu navegador.</p>
   </div>
-  <button id="wipe" class="btn-danger" title="Apaga todos os pedidos do banco (hard delete)">🗑️ Limpar dados</button>
+  <div class="header-actions">
+    <a class="navlink" href="produtos.html">📦 Produtos</a>
+    <button id="wipe" class="btn-danger" title="Apaga todos os pedidos do banco (hard delete)">🗑️ Limpar dados</button>
+  </div>
 </header>
 <main>
   <div id="drop">

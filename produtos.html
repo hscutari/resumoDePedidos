@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produtos — Resumo de Pedidos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{ --rapida:#2563eb; --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --txt:#1f2937; --muted:#6b7280; }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       margin:0;background:var(--bg);color:var(--txt)}
+  header{background:#111827;color:#fff;padding:20px 24px;
+         display:flex;justify-content:space-between;align-items:center;gap:16px}
+  header h1{margin:0;font-size:20px}
+  header p{margin:4px 0 0;color:#9ca3af;font-size:13px}
+  .navlink{color:#fff;background:#374151;text-decoration:none;border-radius:8px;
+           padding:9px 14px;font-size:14px;font-weight:600;white-space:nowrap}
+  .navlink:hover{background:#4b5563}
+  main{max-width:900px;margin:0 auto;padding:24px}
+  #status{font-size:13px;color:var(--muted);margin:0 0 14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:11px 16px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{background:#f9fafb;font-size:12px;color:var(--muted);text-transform:uppercase}
+  tr:first-child td{border-top:0}
+  td.prod{font-weight:600}
+  td.acao{text-align:right;white-space:nowrap}
+  button{border:0;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;
+         cursor:pointer;background:#111827;color:#fff}
+  button:hover{background:#000}
+  .ginfo{font-size:12px;color:#166534;margin-top:4px}
+  tr.empty td{color:var(--muted);font-style:italic;text-align:center;padding:24px}
+  .count{font-size:13px;color:var(--muted);margin:0 0 14px}
+  .search{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
+          font-size:14px;margin:0 0 14px;background:var(--card)}
+  .search:focus{outline:none;border-color:var(--rapida);box-shadow:0 0 0 3px #2563eb22}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Produtos importados</h1>
+    <p>Todos os produtos já vistos nas importações de pedidos.</p>
+  </div>
+  <a class="navlink" href="relatorio_pedidos.html">← Voltar ao resumo</a>
+</header>
+<main>
+  <div id="status"></div>
+  <input type="search" id="busca" class="search" placeholder="🔍 Pesquisar por nome ou código do produto…">
+  <div class="count" id="count"></div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Produto</th><th>Nome</th><th>🖨 Máquina</th><th>⏱ Tempo</th><th>🧩 Peças</th><th class="acao">Ação</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <input type="file" id="gfile" accept=".gcode,.gco,.g,.nc,.ngc,.tap" hidden>
+</main>
+
+<script>
+// ===== Supabase (mesma config do app) =====
+const SUPABASE_URL = "https://upctjkyfazudvttqrysp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwY3Rqa3lmYXp1ZHZ0dHFyeXNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzMyMjQsImV4cCI6MjA5Njg0OTIyNH0.MhSONZDBMfbxOkTKzxip1jZ8Yy56TkYxHePtKtunCcw";
+const db = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const setStatus = s => document.getElementById("status").textContent = s;
+
+function formatBytes(b){
+  if(b < 1024) return b + " B";
+  if(b < 1024*1024) return (b/1024).toFixed(1) + " KB";
+  return (b/1024/1024).toFixed(2) + " MB";
+}
+
+// Converte uma duração textual em segundos. Aceita "1h 2m 3s", "1h2m3s",
+// "2 hours 3 minutes 4 seconds", "1d 2h 3m 4s".
+function parseDuracao(s){
+  s = String(s).toLowerCase();
+  let total = 0, achou = false;
+  for(const [u, mult] of [["d",86400],["h",3600],["m",60],["s",1]]){
+    const m = s.match(new RegExp("(\\d+(?:\\.\\d+)?)\\s*" + u));
+    if(m){ total += parseFloat(m[1]) * mult; achou = true; }
+  }
+  return achou ? Math.round(total) : null;
+}
+
+function formatTempo(seg){
+  if(seg == null) return null;
+  const h = Math.floor(seg/3600), m = Math.floor((seg%3600)/60), s = Math.round(seg%60);
+  const out = [];
+  if(h) out.push(h + "h");
+  if(m) out.push(m + "m");
+  if(!h && s) out.push(s + "s");
+  return out.join(" ") || "0s";
+}
+
+// Lê o conteúdo do gcode e extrai { segundos, pecas } a partir dos comentários do fatiador.
+function parseGcode(txt){
+  let segundos = null, m;
+  if((m = txt.match(/^;TIME:(\d+(?:\.\d+)?)/m)))                                   // Cura
+    segundos = Math.round(+m[1]);
+  else if((m = txt.match(/estimated printing time[^=\n]*=\s*([^\r\n]+)/i)))        // PrusaSlicer/Super/Orca
+    segundos = parseDuracao(m[1]);
+  else if((m = txt.match(/(?:model printing time|total estimated time)\s*[:=]\s*([^\r\n]+)/i))) // Bambu/Orca
+    segundos = parseDuracao(m[1]);
+  else if((m = txt.match(/build time[:=]\s*([^\r\n]+)/i)))                         // Simplify3D
+    segundos = parseDuracao(m[1]);
+
+  let pecas = null;
+  if((m = txt.match(/^M486\s+T\s*(\d+)/mi))) {                                     // PrusaSlicer/Klipper (total)
+    pecas = +m[1];
+  } else {
+    const defs = txt.match(/EXCLUDE_OBJECT_DEFINE\s+NAME=/gi);                     // Klipper/Orca
+    if(defs) pecas = defs.length;
+    else {
+      const ids = new Set(); let mm;
+      const re = /printing object[^\n]*\bid:\s*(\d+)/gi;                           // objetos rotulados
+      while((mm = re.exec(txt))) ids.add(mm[1]);
+      if(ids.size) pecas = ids.size;
+    }
+  }
+
+  let modelo = null;
+  if((m = txt.match(/printer_model\s*=\s*([^\r\n;]+)/i)))                          // PrusaSlicer/Orca/Bambu
+    modelo = m[1].trim();
+  else if((m = txt.match(/^;\s*TARGET_MACHINE\.NAME\s*[:=]\s*([^\r\n]+)/mi)))       // Cura
+    modelo = m[1].trim();
+  else if((m = txt.match(/^;\s*(?:machine_name|printer_name|printer_settings_id)\s*[:=]\s*([^\r\n]+)/mi)))
+    modelo = m[1].trim();
+
+  return { segundos, pecas, modelo };
+}
+
+const gfile = document.getElementById("gfile");
+let produtoAlvo = null;   // código do produto cujo gcode está sendo importado
+
+// Botão "Importar gcode" -> abre o seletor de arquivo
+document.getElementById("tbody").addEventListener("click", e => {
+  const btn = e.target.closest("button.imp");
+  if(!btn) return;
+  produtoAlvo = btn.dataset.cod;
+  gfile.value = "";
+  gfile.click();
+});
+
+// Ao escolher o arquivo: por enquanto só lê e mostra nome/tamanho/linhas (não salva)
+gfile.addEventListener("change", async () => {
+  const f = gfile.files[0];
+  if(!f || !produtoAlvo) return;
+  const alvo = document.querySelector(`.ginfo[data-cod="${CSS.escape(produtoAlvo)}"]`);
+  if(alvo) alvo.textContent = "Lendo…";
+  const cod = produtoAlvo;
+  try{
+    const txt = await f.text();
+    const linhas = txt.split(/\r\n|\r|\n/).length;
+    const { segundos, pecas, modelo } = parseGcode(txt);
+    await salvarGcode(cod, { arquivo: f.name, modelo, segundos, pecas, linhas, tamanho: f.size });
+    gcodeMap[cod] = { arquivo: f.name, modelo, tempo_segundos: segundos, pecas, linhas };
+    renderProdutos(document.getElementById("busca").value);
+    setStatus(`✅ gcode de ${cod} salvo · 🖨 ${modelo ?? "—"} · ⏱ ${formatTempo(segundos) ?? "—"} · 🧩 ${pecas ?? "—"} peça(s).`);
+  }catch(err){
+    if(alvo) alvo.textContent = "Erro: " + err.message;
+    setStatus("Erro ao salvar gcode: " + err.message);
+    console.error(err);
+  }
+});
+
+let produtos = [];   // todos os produtos carregados do banco
+let gcodeMap = {};   // codigo -> { arquivo, tempo_segundos, pecas, linhas }
+
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+
+async function salvarGcode(produto, d){
+  if(!db) return;
+  const { error } = await db.from("gcodes").upsert({
+    produto, arquivo: d.arquivo, modelo: d.modelo, tempo_segundos: d.segundos, pecas: d.pecas,
+    linhas: d.linhas, tamanho_bytes: d.tamanho, atualizado_em: new Date().toISOString()
+  }, { onConflict: "produto" });
+  if(error) throw error;
+}
+
+function renderProdutos(filtro = ""){
+  const tbody = document.getElementById("tbody");
+  const f = norm(filtro.trim());
+  const lista = f
+    ? produtos.filter(p => norm(p.nome).includes(f) || norm(p.codigo).includes(f))
+    : produtos;
+
+  if(!produtos.length){
+    tbody.innerHTML = `<tr class="empty"><td colspan="6">Nenhum produto importado ainda.</td></tr>`;
+    document.getElementById("count").textContent = "";
+    return;
+  }
+  if(!lista.length){
+    tbody.innerHTML = `<tr class="empty"><td colspan="6">Nenhum produto encontrado para “${esc(filtro)}”.</td></tr>`;
+    document.getElementById("count").textContent = `0 de ${produtos.length} produto(s).`;
+    return;
+  }
+  tbody.innerHTML = lista.map(p => {
+    const g = gcodeMap[p.codigo];
+    const modelo = g && g.modelo ? esc(g.modelo) : "—";
+    const tempo = g && g.tempo_segundos != null ? formatTempo(g.tempo_segundos) : "—";
+    const pecas = g && g.pecas != null ? g.pecas : "—";
+    const arq = g && g.arquivo ? `📄 ${esc(g.arquivo)}` : "";
+    return `
+    <tr>
+      <td class="prod">${esc(p.codigo)}</td>
+      <td>${esc(p.nome) || "<span style='color:#9ca3af'>—</span>"}
+          <div class="ginfo" data-cod="${esc(p.codigo)}">${arq}</div></td>
+      <td>${modelo}</td>
+      <td>${tempo}</td>
+      <td>${pecas}</td>
+      <td class="acao"><button class="imp" data-cod="${esc(p.codigo)}">📥 Importar gcode</button></td>
+    </tr>`; }).join("");
+  document.getElementById("count").textContent =
+    f ? `${lista.length} de ${produtos.length} produto(s).` : `${produtos.length} produto(s).`;
+}
+
+document.getElementById("busca").addEventListener("input", e => renderProdutos(e.target.value));
+
+async function carregarProdutos(){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  setStatus("Carregando produtos…");
+  const [prodRes, gcRes] = await Promise.all([
+    db.from("produtos").select("codigo,nome").order("codigo"),
+    db.from("gcodes").select("produto,arquivo,modelo,tempo_segundos,pecas,linhas")
+  ]);
+  if(prodRes.error){ setStatus("Erro: " + prodRes.error.message); console.error(prodRes.error); return; }
+  produtos = prodRes.data;
+  gcodeMap = {};
+  if(!gcRes.error) for(const g of gcRes.data) gcodeMap[g.produto] = g;
+  renderProdutos(document.getElementById("busca").value);
+  setStatus("");
+}
+
+carregarProdutos();
+</script>
+</body>
+</html>

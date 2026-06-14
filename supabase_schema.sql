@@ -51,6 +51,19 @@ create index if not exists idx_pedidos_relatorio on pedidos(relatorio_id);
 create index if not exists idx_pedidos_produto   on pedidos(produto, variacao);
 create index if not exists idx_pedidos_pedido    on pedidos(pedido);
 
+-- 5) Gcode por produto (tempo estimado + nº de peças) ---------
+--    1 registro por produto (atualiza ao reimportar). Ligado a produtos.
+create table if not exists gcodes (
+  produto        text primary key references produtos(codigo) on delete cascade,
+  arquivo        text,
+  modelo         text,                       -- modelo da máquina (impressora)
+  tempo_segundos integer,
+  pecas          integer,
+  linhas         integer,
+  tamanho_bytes  bigint,
+  atualizado_em  timestamptz not null default now()
+);
+
 -- ============================================================
 -- Segurança (RLS)
 -- Para uma ferramenta interna simples, liberamos acesso via a
@@ -64,7 +77,9 @@ alter table relatorios enable row level security;
 alter table pedidos    enable row level security;
 
 -- Políticas permissivas para o papel anon (acesso total)
+alter table gcodes     enable row level security;
 create policy "anon_all_produtos"   on produtos   for all to anon using (true) with check (true);
 create policy "anon_all_estoque"    on estoque    for all to anon using (true) with check (true);
 create policy "anon_all_relatorios" on relatorios for all to anon using (true) with check (true);
 create policy "anon_all_pedidos"    on pedidos    for all to anon using (true) with check (true);
+create policy "anon_all_gcodes"     on gcodes     for all to anon using (true) with check (true);
