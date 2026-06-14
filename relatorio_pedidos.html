@@ -56,6 +56,10 @@
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
   .warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:10px 14px;
         border-radius:8px;font-size:13px;margin:12px 0}
+  .daybar{display:flex;justify-content:flex-end;align-items:center;gap:8px;
+          margin:10px 0 0;font-size:13px;color:var(--muted)}
+  .daybar input{padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+                font-size:14px;background:var(--card);cursor:pointer}
   .urlbox{margin-top:14px}
   .urlbox label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
   .urlbox textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;
@@ -136,6 +140,10 @@ https://github.com/usuario/repositorio/tree/main/pdfs"></textarea>
   </div>
   <div id="dbstatus" class="hint"></div>
   <div id="status"></div>
+  <div class="daybar">
+    <span>📅 Ver vendas do dia:</span>
+    <input type="date" id="dataSel">
+  </div>
   <div id="report"></div>
 </main>
 
@@ -162,6 +170,7 @@ const hojeISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
+let dataAtual = hojeISO();   // dia atualmente exibido na tela (default: hoje)
 
 // Chave do estoque: o estoque é por ENVIO (origem) + produto + variação.
 const estKey = (origem, produto, variacao) => origem + " ||| " + produto + " ||| " + variacao;
@@ -169,7 +178,7 @@ const estKey = (origem, produto, variacao) => origem + " ||| " + produto + " |||
 async function carregarEstoque(){
   if(!db) return {};
   const { data, error } = await db.from("estoque")
-    .select("produto,variacao,origem,quantidade").eq("dia", hojeISO());
+    .select("produto,variacao,origem,quantidade").eq("dia", dataAtual);
   if(error){ console.error("carregarEstoque:", error); return {}; }
   const m = {};
   for(const r of data) m[estKey(r.origem, r.produto, r.variacao)] = r.quantidade;
@@ -184,7 +193,7 @@ function salvarEstoque(origem, produto, variacao, quantidade){
   clearTimeout(_saveTimers[key]);
   _saveTimers[key] = setTimeout(async () => {
     const { error } = await db.from("estoque").upsert(
-      { produto, variacao, origem, dia: hojeISO(), quantidade, atualizado_em: new Date().toISOString() },
+      { produto, variacao, origem, dia: dataAtual, quantidade, atualizado_em: new Date().toISOString() },
       { onConflict: "produto,variacao,origem,dia" });
     if(error) console.error("salvarEstoque:", error);
   }, 500);
@@ -195,7 +204,7 @@ function removerEstoque(origem, produto, variacao){
   const key = estKey(origem, produto, variacao);
   delete estoqueSalvo[key];
   clearTimeout(_saveTimers[key]);
-  db.from("estoque").delete().match({ produto, variacao, origem, dia: hojeISO() })
+  db.from("estoque").delete().match({ produto, variacao, origem, dia: dataAtual })
     .then(({ error }) => { if(error) console.error("removerEstoque:", error); });
 }
 
@@ -377,26 +386,48 @@ async function inserirPedidos(novas){
   }
 }
 
-// Carrega do banco todas as vendas importadas HOJE (criado_em >= meia-noite local)
-async function carregarVendasDoDia(){
+const formatarData = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+
+// Carrega do banco as vendas importadas em um DIA específico (YYYY-MM-DD, hora local)
+async function carregarVendasDaData(diaISO){
   if(!db) return [];
-  const agora = new Date();
-  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString();
+  const [y, m, d] = diaISO.split("-").map(Number);
+  const inicio = new Date(y, m - 1, d).toISOString();
+  const fim = new Date(y, m - 1, d + 1).toISOString();   // até a meia-noite do dia seguinte
   const linhas = [];
   const tam = 1000;
   for(let from = 0; ; from += tam){
     const { data, error } = await db.from("pedidos")
       .select("pedido,origem,produto,variacao,quantidade")
-      .gte("criado_em", inicio)
+      .gte("criado_em", inicio).lt("criado_em", fim)
       .order("id", { ascending: true })
       .range(from, from + tam - 1);
-    if(error){ console.error("carregarVendasDoDia:", error); break; }
+    if(error){ console.error("carregarVendasDaData:", error); break; }
     linhas.push(...data.map(r => ({
       pedido: r.pedido, origem: r.origem, produto: r.produto, varia: r.variacao, qty: r.quantidade
     })));
     if(data.length < tam) break;
   }
   return linhas;
+}
+
+// Exibe na tela as vendas (e estoque) de um dia
+async function mostrarDia(diaISO){
+  if(!db) return;
+  dataAtual = diaISO;
+  setStatus(`Carregando vendas de ${formatarData(diaISO)}…`);
+  estoqueSalvo = await carregarEstoque();
+  const linhas = await carregarVendasDaData(diaISO);
+  if(linhas.length){
+    resultado = agregarLinhas(linhas);
+    render(resultado);
+    txtBtn.disabled = csvBtn.disabled = false;
+  } else {
+    resultado = null;
+    document.getElementById("report").innerHTML = "";
+    txtBtn.disabled = csvBtn.disabled = true;
+  }
+  setStatus(`📅 ${formatarData(diaISO)}${diaISO === hojeISO() ? " (hoje)" : ""}: ${linhas.length} venda(s).`);
 }
 
 function ordenar(map){
@@ -651,6 +682,7 @@ const drop = document.getElementById("drop");
 const input = document.getElementById("input");
 const filesEl = document.getElementById("files");
 const urlsEl = document.getElementById("urls");
+const dataSel = document.getElementById("dataSel");
 const goBtn = document.getElementById("go");
 const goUrlBtn = document.getElementById("goUrl");
 const txtBtn = document.getElementById("txt");
@@ -704,6 +736,8 @@ async function run(sources){
   document.getElementById("report").innerHTML = "";
   try{
     if(!sources.length){ setStatus("Nada para processar."); return; }
+    dataAtual = hojeISO();                       // importação é sempre no dia de hoje
+    if(dataSel) dataSel.value = dataAtual;
     const linhas = await processar(sources);
     setStatus("Verificando vendas já existentes no banco…");
     const { novas, ignoradas } = await filtrarNovas(linhas);
@@ -760,21 +794,18 @@ clearBtn.addEventListener("click", () => {
   txtBtn.disabled = csvBtn.disabled = true;
 });
 
-// Ao abrir a tela: mostra todas as vendas importadas hoje (do banco)
+// Calendário: ao escolher uma data, mostra as vendas importadas naquele dia
+if(dataSel){
+  dataSel.max = hojeISO();
+  dataSel.addEventListener("change", () => { if(dataSel.value) mostrarDia(dataSel.value); });
+}
+
+// Ao abrir a tela: mostra as vendas importadas hoje (do banco)
 (async function initDia(){
   if(!db) return;
+  if(dataSel) dataSel.value = hojeISO();
   try{
-    setStatus("Carregando vendas de hoje…");
-    estoqueSalvo = await carregarEstoque();
-    const linhas = await carregarVendasDoDia();
-    if(linhas.length){
-      resultado = agregarLinhas(linhas);
-      render(resultado);
-      txtBtn.disabled = csvBtn.disabled = false;
-      setStatus(`📅 Vendas importadas hoje: ${linhas.length}.`);
-    } else {
-      setStatus("Nenhuma venda importada hoje ainda. Importe um arquivo ou link.");
-    }
+    await mostrarDia(hojeISO());
   }catch(err){ setStatus("Erro ao carregar vendas do dia: " + err.message); console.error(err); }
 })();
 </script>
