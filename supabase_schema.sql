@@ -51,18 +51,22 @@ create index if not exists idx_pedidos_relatorio on pedidos(relatorio_id);
 create index if not exists idx_pedidos_produto   on pedidos(produto, variacao);
 create index if not exists idx_pedidos_pedido    on pedidos(pedido);
 
--- 5) Gcode por produto (tempo estimado + nº de peças) ---------
---    1 registro por produto (atualiza ao reimportar). Ligado a produtos.
-create table if not exists gcodes (
-  produto        text primary key references produtos(codigo) on delete cascade,
+-- 5) Gcodes (tabela ÚNICA) — import individual E em lote (bulk) ----
+--    `produto` nulo = arquivo avulso (a vincular); preenchido = vinculado.
+--    1 produto -> 1 arquivo (regra de negócio aplicada no app).
+create table if not exists gcode_arquivos (
+  id             bigint generated always as identity primary key,
   arquivo        text,
-  modelo         text,                       -- modelo da máquina (impressora)
+  modelo         text,
   tempo_segundos integer,
   pecas          integer,
   linhas         integer,
   tamanho_bytes  bigint,
-  atualizado_em  timestamptz not null default now()
+  produto        text references produtos(codigo) on delete set null,
+  criado_em      timestamptz not null default now()
 );
+
+create index if not exists idx_gcode_arquivos_produto on gcode_arquivos(produto);
 
 -- ============================================================
 -- Segurança (RLS)
@@ -71,15 +75,15 @@ create table if not exists gcodes (
 -- frontend; quem tiver a URL do site pode ler/gravar.
 -- Se precisar restringir, troque por políticas com auth depois.
 -- ============================================================
-alter table produtos   enable row level security;
-alter table estoque    enable row level security;
-alter table relatorios enable row level security;
-alter table pedidos    enable row level security;
+alter table produtos       enable row level security;
+alter table estoque        enable row level security;
+alter table relatorios     enable row level security;
+alter table pedidos        enable row level security;
+alter table gcode_arquivos enable row level security;
 
 -- Políticas permissivas para o papel anon (acesso total)
-alter table gcodes     enable row level security;
 create policy "anon_all_produtos"   on produtos   for all to anon using (true) with check (true);
 create policy "anon_all_estoque"    on estoque    for all to anon using (true) with check (true);
 create policy "anon_all_relatorios" on relatorios for all to anon using (true) with check (true);
 create policy "anon_all_pedidos"    on pedidos    for all to anon using (true) with check (true);
-create policy "anon_all_gcodes"     on gcodes     for all to anon using (true) with check (true);
+create policy "anon_all_gcode_arquivos" on gcode_arquivos for all to anon using (true) with check (true);

@@ -16,17 +16,21 @@
   header h1{margin:0;font-size:20px}
   header p{margin:4px 0 0;color:#9ca3af;font-size:13px}
   .navlink{color:#fff;background:#374151;text-decoration:none;border-radius:8px;
-           padding:9px 14px;font-size:14px;font-weight:600;white-space:nowrap}
+           padding:9px 14px;font-size:14px;font-weight:600;white-space:nowrap;border:0;cursor:pointer}
   .navlink:hover{background:#4b5563}
-  main{max-width:900px;margin:0 auto;padding:24px}
+  .navlink.primary{background:var(--rapida)}
+  .navlink.primary:hover{background:#1d4ed8}
+  .navactions{display:flex;gap:10px;align-items:center}
+  main{max-width:1180px;margin:0 auto;padding:24px}
   #status{font-size:13px;color:var(--muted);margin:0 0 14px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{padding:11px 16px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
+  th,td{padding:10px 14px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
   th{background:#f9fafb;font-size:12px;color:var(--muted);text-transform:uppercase}
   tr:first-child td{border-top:0}
-  td.prod{font-weight:600}
-  td.acao{text-align:right;white-space:nowrap}
+  td.prod{font-weight:600;word-break:break-all}
+  td.acao{text-align:right;white-space:nowrap;width:1%}
+  td.acao button{white-space:nowrap}
   button{border:0;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;
          cursor:pointer;background:#111827;color:#fff}
   button:hover{background:#000}
@@ -36,6 +40,63 @@
   .search{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
           font-size:14px;margin:0 0 14px;background:var(--card)}
   .search:focus{outline:none;border-color:var(--rapida);box-shadow:0 0 0 3px #2563eb22}
+  /* Modal de vínculo */
+  .overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;
+           align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:var(--card);border-radius:14px;width:100%;max-width:720px;
+         box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+  .modal.lg{max-width:920px}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;
+              padding:18px 22px;border-bottom:1px solid var(--line)}
+  .modal-head h2{margin:0;font-size:17px}
+  .modal-head .x{background:transparent;color:var(--muted);font-size:20px;padding:4px 10px}
+  .modal-head .x:hover{background:#f3f4f6;color:#111}
+  .modal-body{padding:14px 22px;max-height:64vh;overflow:auto}
+  .vsec-label{font-size:12px;color:var(--muted);text-transform:uppercase;
+              font-weight:700;letter-spacing:.03em;margin:0 0 8px}
+  /* zona dos arquivos arrastáveis */
+  .filechips{display:flex;flex-wrap:wrap;gap:8px;min-height:54px;padding:10px;
+             border:1.5px dashed var(--line);border-radius:10px;background:#fafafa}
+  .filechips:empty::after{content:"Todos os arquivos foram atribuídos ✅";
+             color:var(--muted);font-size:13px;font-style:italic}
+  .filechip{display:inline-flex;align-items:center;gap:6px;cursor:grab;
+            background:#eef2ff;border:1px solid #c7d2fe;color:#1e3a8a;
+            border-radius:9px;padding:7px 11px;font-size:12px;font-weight:600;
+            max-width:240px;user-select:none}
+  .filechip:active{cursor:grabbing}
+  .filechip.dragging{opacity:.45}
+  .filechip .fn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* grid de produtos (alvos de soltar) */
+  .prodgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .prodsquare{position:relative;border:1.5px solid var(--line);border-radius:12px;padding:12px;min-height:96px;
+              display:flex;flex-direction:column;gap:6px;background:var(--card);transition:.12s}
+  .prodsquare .pcod{font-weight:700;font-size:13px;word-break:break-all}
+  .prodsquare .pnome{font-size:12px;color:var(--muted);line-height:1.3}
+  .prodsquare.drophover{border-color:var(--rapida);background:#eff6ff;
+              box-shadow:0 0 0 3px #2563eb22}
+  .prodsquare.assigned{border-color:#16a34a;background:#f0fdf4}
+  .prodsquare.linked{border-color:#dc2626;background:#fef2f2}
+  .prodsquare .unlink-x{position:absolute;top:6px;right:6px;width:22px;height:22px;
+              display:flex;align-items:center;justify-content:center;border-radius:50%;
+              background:#dc2626;color:#fff;font-size:13px;font-weight:800;cursor:pointer;line-height:1}
+  .prodsquare .unlink-x:hover{background:#991b1b}
+  .prodsquare.linked .pcod{padding-right:24px}
+  .linkedfile{display:inline-flex;align-items:center;gap:6px;margin-top:auto;
+              background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;
+              border-radius:8px;padding:5px 8px;font-size:11px;font-weight:600}
+  .linkedfile .fn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+  .assignedchip{display:inline-flex;align-items:center;gap:6px;margin-top:auto;
+              background:#dcfce7;border:1px solid #86efac;color:#166534;
+              border-radius:8px;padding:5px 8px;font-size:11px;font-weight:600}
+  .assignedchip .fn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+  .assignedchip .rm{cursor:pointer;color:#16a34a;font-weight:800;padding:0 2px}
+  .assignedchip .rm:hover{color:#b91c1c}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;
+              padding:16px 22px;border-top:1px solid var(--line)}
+  .modal-foot .hint{font-size:12px;color:var(--muted)}
+  .btn-ghost{background:#f3f4f6;color:#111}
+  .btn-ghost:hover{background:#e5e7eb}
 </style>
 </head>
 <body>
@@ -44,7 +105,11 @@
     <h1>Produtos importados</h1>
     <p>Todos os produtos já vistos nas importações de pedidos.</p>
   </div>
-  <a class="navlink" href="relatorio_pedidos.html">← Voltar ao resumo</a>
+  <div class="navactions">
+    <button id="bulk" class="navlink primary">📦 Importar vários (gcode/3mf)</button>
+    <a class="navlink" href="producao.html">🖨️ Produção</a>
+    <a class="navlink" href="relatorio_pedidos.html">← Voltar ao resumo</a>
+  </div>
 </header>
 <main>
   <div id="status"></div>
@@ -57,6 +122,43 @@
     </table>
   </div>
   <input type="file" id="gfile" accept=".gcode,.gco,.g,.nc,.ngc,.tap,.3mf" hidden>
+  <input type="file" id="bulkfile" accept=".gcode,.gco,.g,.nc,.ngc,.tap,.3mf" multiple hidden>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px;gap:12px">
+    <h2 id="bulkTitle" style="font-size:16px;margin:0">📦 Arquivos importados (a vincular)</h2>
+    <button id="abrirVincular" class="navlink primary" style="display:none">🔗 Vincular a produtos</button>
+  </div>
+  <div class="count" id="bulkCount"></div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Arquivo</th><th>🖨 Máquina</th><th>⏱ Tempo</th><th>🧩 Peças</th><th>🔗 Produto</th><th class="acao">Ação</th></tr></thead>
+      <tbody id="bulkBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Modal de vínculo -->
+  <div class="overlay" id="vincOverlay">
+    <div class="modal lg">
+      <div class="modal-head">
+        <h2>🔗 Vincular arquivos a produtos</h2>
+        <button class="x" id="vincFechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="vsec-label">📄 Arquivos — arraste para o produto</div>
+        <div class="filechips" id="vincFiles"></div>
+        <input type="search" id="vincBusca" class="search" placeholder="🔍 Filtrar produtos…" style="margin:16px 0 12px">
+        <div class="vsec-label">📦 Produtos — solte o arquivo aqui</div>
+        <div class="prodgrid" id="vincProds"></div>
+      </div>
+      <div class="modal-foot">
+        <span class="hint" id="vincHint"></span>
+        <div style="display:flex;gap:10px">
+          <button class="btn-ghost" id="vincCancelar">Cancelar</button>
+          <button id="vincSalvar" style="background:var(--rapida)">Salvar vínculos</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -206,8 +308,7 @@ gfile.addEventListener("change", async () => {
   try{
     const { segundos, pecas, modelo, linhas } = await lerArquivo(f);
     await salvarGcode(cod, { arquivo: f.name, modelo, segundos, pecas, linhas, tamanho: f.size });
-    gcodeMap[cod] = { arquivo: f.name, modelo, tempo_segundos: segundos, pecas, linhas };
-    renderProdutos(document.getElementById("busca").value);
+    await carregarBulk();   // reconstrói gcodeMap + re-renderiza tabela e lista
     setStatus(`✅ ${cod} salvo · 🖨 ${modelo ?? "—"} · ⏱ ${formatTempo(segundos) ?? "—"} · 🧩 ${pecas ?? "—"} peça(s).`);
   }catch(err){
     if(alvo) alvo.textContent = "Erro: " + err.message;
@@ -216,17 +317,275 @@ gfile.addEventListener("change", async () => {
   }
 });
 
+// ===== Bulk import (vários arquivos, SEM vínculo a produto) =====
+const bulkfile = document.getElementById("bulkfile");
+document.getElementById("bulk").addEventListener("click", () => { bulkfile.value = ""; bulkfile.click(); });
+
+bulkfile.addEventListener("change", async () => {
+  const files = Array.from(bulkfile.files || []);
+  if(!files.length) return;
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  let ok = 0, falhas = 0;
+  for(let i = 0; i < files.length; i++){
+    const f = files[i];
+    setStatus(`Importando ${i+1}/${files.length}: ${f.name}…`);
+    try{
+      const { segundos, pecas, modelo, linhas } = await lerArquivo(f);
+      const { error } = await db.from("gcode_arquivos").insert({
+        arquivo: f.name, modelo, tempo_segundos: segundos, pecas, linhas,
+        tamanho_bytes: f.size, produto: null
+      });
+      if(error) throw error;
+      ok++;
+    }catch(err){ falhas++; console.error(f.name, err); }
+  }
+  await carregarBulk();
+  setStatus(`✅ Bulk: ${ok} importado(s)${falhas ? ` · ${falhas} falha(s)` : ""}.`);
+});
+
+let bulkArquivos = [];   // gcode_arquivos do banco (a vincular ou já vinculados)
+
+async function carregarBulk(){
+  if(!db) return;
+  const { data, error } = await db.from("gcode_arquivos")
+    .select("id,arquivo,modelo,tempo_segundos,pecas,linhas,produto").order("id", { ascending: false });
+  if(error){ console.error(error); return; }
+  bulkArquivos = data || [];
+  // gcodeMap (produto -> arquivo vinculado) vem da MESMA tabela
+  gcodeMap = {};
+  for(const a of bulkArquivos) if(a.produto && !gcodeMap[a.produto]) gcodeMap[a.produto] = a;
+  renderBulk();
+  renderProdutos(document.getElementById("busca").value);  // tabela de produtos usa gcodeMap
+}
+
+function renderBulk(){
+  const tbody = document.getElementById("bulkBody");
+  if(!bulkArquivos.length){
+    tbody.innerHTML = `<tr class="empty"><td colspan="6">Nenhum arquivo importado em lote ainda.</td></tr>`;
+    document.getElementById("bulkCount").textContent = "";
+    return;
+  }
+  tbody.innerHTML = bulkArquivos.map(a => {
+    const modelo = a.modelo ? esc(a.modelo) : "—";
+    const tempo = a.tempo_segundos != null ? formatTempo(a.tempo_segundos) : "—";
+    const pecas = a.pecas != null ? a.pecas : "—";
+    const prod = a.produto
+      ? `✅ ${esc(a.produto)}`
+      : `<span style="color:#9ca3af">a vincular</span>`;
+    return `
+    <tr>
+      <td class="prod">📄 ${esc(a.arquivo)}</td>
+      <td>${modelo}</td>
+      <td>${tempo}</td>
+      <td>${pecas}</td>
+      <td>${prod}</td>
+      <td class="acao"><button class="del-bulk" data-id="${a.id}" style="background:#b91c1c">🗑️ Remover</button></td>
+    </tr>`; }).join("");
+  const naoVinc = bulkArquivos.filter(a => !a.produto).length;
+  document.getElementById("bulkCount").textContent =
+    `${bulkArquivos.length} arquivo(s)${naoVinc ? ` · ${naoVinc} a vincular` : ""}.`;
+  document.getElementById("abrirVincular").style.display = bulkArquivos.length ? "" : "none";
+}
+
+// ===== Modal: vincular arquivos importados a produtos =====
+const vincOverlay = document.getElementById("vincOverlay");
+
+function fecharVincular(){ vincOverlay.classList.remove("open"); }
+document.getElementById("vincFechar").addEventListener("click", fecharVincular);
+document.getElementById("vincCancelar").addEventListener("click", fecharVincular);
+vincOverlay.addEventListener("click", e => { if(e.target === vincOverlay) fecharVincular(); });
+
+// estado do modal: id do arquivo -> código do produto (atribuições pendentes)
+let vincAtrib = {};
+
+function abrirVincular(){
+  if(!bulkArquivos.length) return;
+  vincAtrib = {};
+  document.getElementById("vincBusca").value = "";
+  renderVincFiles();
+  renderVincProds("");
+  atualizarVincHint();
+  vincOverlay.classList.add("open");
+}
+document.getElementById("abrirVincular").addEventListener("click", abrirVincular);
+
+// arquivos ainda não atribuídos (chips arrastáveis)
+function renderVincFiles(){
+  const zona = document.getElementById("vincFiles");
+  const livres = bulkArquivos.filter(a => !a.produto && !vincAtrib[a.id]);
+  zona.innerHTML = livres.map(a => {
+    const meta = [a.modelo, a.tempo_segundos != null ? formatTempo(a.tempo_segundos) : null,
+                  a.pecas != null ? `${a.pecas}p` : null].filter(Boolean).join(" · ");
+    return `<div class="filechip" draggable="true" data-id="${a.id}"
+      title="${esc(a.arquivo)}${meta ? " — " + esc(meta) : ""}">
+      📄 <span class="fn">${esc(a.arquivo)}</span></div>`; }).join("");
+}
+
+// grid de produtos (alvos), filtrável; mostra arquivo atribuído quando houver
+function renderVincProds(filtro){
+  const grid = document.getElementById("vincProds");
+  const f = norm((filtro || "").trim());
+  const lista = f ? produtos.filter(p => norm(p.nome).includes(f) || norm(p.codigo).includes(f)) : produtos;
+  // produtos com atribuição pendente sempre aparecem
+  const atribIds = Object.values(vincAtrib);
+  const extra = produtos.filter(p => atribIds.includes(p.codigo) && !lista.includes(p));
+  const final = [...extra, ...lista];
+  grid.innerHTML = final.map(p => {
+    // atribuição pendente (arrastada agora, ainda não salva)
+    const fid = Object.keys(vincAtrib).find(id => vincAtrib[id] === p.codigo);
+    const arq = fid ? bulkArquivos.find(a => a.id === +fid) : null;
+    // arquivo já vinculado: fonte de verdade é a tabela gcodes (gcodeMap)
+    const linked = !arq ? gcodeMap[p.codigo] : null;
+    const linkedBulk = linked ? bulkArquivos.find(a => a.produto === p.codigo) : null;
+
+    let cls = "", inner = "";
+    if(arq){
+      cls = " assigned";
+      inner = `<div class="assignedchip" title="${esc(arq.arquivo)}">📄 <span class="fn">${esc(arq.arquivo)}</span>
+                 <span class="rm" data-rm="${arq.id}">✕</span></div>`;
+    }else if(linked){
+      cls = " linked";
+      const nomeArq = linked.arquivo || "gcode vinculado";
+      inner = `<span class="unlink-x" data-cod="${esc(p.codigo)}" data-arqid="${linkedBulk ? linkedBulk.id : ""}" title="Desvincular arquivo">✕</span>
+               <div class="linkedfile" title="${esc(nomeArq)}">🔗 <span class="fn">${esc(nomeArq)}</span></div>`;
+    }
+    return `<div class="prodsquare${cls}" data-cod="${esc(p.codigo)}">
+      <div class="pcod">${esc(p.codigo)}</div>
+      <div class="pnome">${esc(p.nome || "")}</div>
+      ${inner}
+    </div>`; }).join("");
+}
+
+function atualizarVincHint(){
+  const total = bulkArquivos.filter(a => !a.produto).length;
+  const atrib = Object.keys(vincAtrib).length;
+  document.getElementById("vincHint").textContent =
+    `${atrib} de ${total} arquivo(s) atribuído(s) — arraste e solte para vincular.`;
+}
+
+document.getElementById("vincBusca").addEventListener("input", e => renderVincProds(e.target.value));
+
+// ---- Drag and drop ----
+const vincFilesZone = document.getElementById("vincFiles");
+const vincProdsZone = document.getElementById("vincProds");
+
+vincFilesZone.addEventListener("dragstart", e => {
+  const chip = e.target.closest(".filechip");
+  if(!chip) return;
+  e.dataTransfer.setData("text/plain", chip.dataset.id);
+  e.dataTransfer.effectAllowed = "move";
+  chip.classList.add("dragging");
+});
+vincFilesZone.addEventListener("dragend", e => {
+  const chip = e.target.closest(".filechip");
+  if(chip) chip.classList.remove("dragging");
+});
+
+vincProdsZone.addEventListener("dragover", e => {
+  const sq = e.target.closest(".prodsquare");
+  if(!sq) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  sq.classList.add("drophover");
+});
+vincProdsZone.addEventListener("dragleave", e => {
+  const sq = e.target.closest(".prodsquare");
+  if(sq) sq.classList.remove("drophover");
+});
+vincProdsZone.addEventListener("drop", e => {
+  const sq = e.target.closest(".prodsquare");
+  if(!sq) return;
+  e.preventDefault();
+  sq.classList.remove("drophover");
+  const id = e.dataTransfer.getData("text/plain");
+  if(!id) return;
+  const cod = sq.dataset.cod;
+  // se este produto já tinha outro arquivo, devolve o antigo para a zona de arquivos
+  for(const k of Object.keys(vincAtrib)) if(vincAtrib[k] === cod) delete vincAtrib[k];
+  vincAtrib[id] = cod;                          // 1 arquivo -> 1 produto
+  renderVincFiles();
+  renderVincProds(document.getElementById("vincBusca").value);
+  atualizarVincHint();
+});
+
+// remover atribuição pendente (✕ no chip verde) OU desvincular salvo (✕ vermelho no canto)
+vincProdsZone.addEventListener("click", async e => {
+  const rm = e.target.closest(".rm");
+  if(rm){
+    delete vincAtrib[rm.dataset.rm];
+    renderVincFiles();
+    renderVincProds(document.getElementById("vincBusca").value);
+    atualizarVincHint();
+    return;
+  }
+  const ux = e.target.closest(".unlink-x");
+  if(ux && db){
+    const cod = ux.dataset.cod;
+    document.getElementById("vincHint").textContent = "Desvinculando…";
+    try{
+      // tabela única: desvincular = devolver o arquivo ao pool (produto = null)
+      const u1 = await db.from("gcode_arquivos").update({ produto: null }).eq("produto", cod);
+      if(u1.error) throw u1.error;
+      await carregarBulk();   // recarrega bulkArquivos/gcodeMap
+      renderVincFiles();
+      renderVincProds(document.getElementById("vincBusca").value);
+      atualizarVincHint();
+      setStatus(`✅ Arquivo desvinculado de ${cod}.`);
+    }catch(err){
+      document.getElementById("vincHint").textContent = "Erro ao desvincular: " + err.message;
+      console.error(err);
+    }
+  }
+});
+
+document.getElementById("vincSalvar").addEventListener("click", async () => {
+  if(!db) return;
+  const escolhas = Object.entries(vincAtrib).map(([id, produto]) => ({ id: +id, produto }));
+  if(!escolhas.length){ fecharVincular(); return; }
+
+  document.getElementById("vincHint").textContent = "Salvando…";
+  let ok = 0;
+  for(const { id, produto } of escolhas){
+    try{
+      // 1 produto -> 1 arquivo: devolve vínculos anteriores desse produto ao pool
+      const u0 = await db.from("gcode_arquivos").update({ produto: null }).eq("produto", produto).neq("id", id);
+      if(u0.error) throw u0.error;
+      const u1 = await db.from("gcode_arquivos").update({ produto }).eq("id", id);
+      if(u1.error) throw u1.error;
+      ok++;
+    }catch(err){ console.error(id, err); }
+  }
+  fecharVincular();
+  await carregarBulk();
+  setStatus(`✅ ${ok} arquivo(s) vinculado(s) a produto(s).`);
+});
+
+// Remover um arquivo importado em lote
+document.getElementById("bulkBody").addEventListener("click", async e => {
+  const btn = e.target.closest("button.del-bulk");
+  if(!btn || !db) return;
+  const id = +btn.dataset.id;
+  const { error } = await db.from("gcode_arquivos").delete().eq("id", id);
+  if(error){ setStatus("Erro ao remover: " + error.message); return; }
+  bulkArquivos = bulkArquivos.filter(a => a.id !== id);
+  renderBulk();
+});
+
 let produtos = [];   // todos os produtos carregados do banco
 let gcodeMap = {};   // codigo -> { arquivo, tempo_segundos, pecas, linhas }
 
 const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
 
+// Import individual: grava na tabela única gcode_arquivos já vinculado ao produto.
 async function salvarGcode(produto, d){
   if(!db) return;
-  const { error } = await db.from("gcodes").upsert({
-    produto, arquivo: d.arquivo, modelo: d.modelo, tempo_segundos: d.segundos, pecas: d.pecas,
-    linhas: d.linhas, tamanho_bytes: d.tamanho, atualizado_em: new Date().toISOString()
-  }, { onConflict: "produto" });
+  // 1 produto -> 1 arquivo: devolve qualquer vínculo anterior ao pool
+  const up = await db.from("gcode_arquivos").update({ produto: null }).eq("produto", produto);
+  if(up.error) throw up.error;
+  const { error } = await db.from("gcode_arquivos").insert({
+    arquivo: d.arquivo, modelo: d.modelo, tempo_segundos: d.segundos, pecas: d.pecas,
+    linhas: d.linhas, tamanho_bytes: d.tamanho, produto
+  });
   if(error) throw error;
 }
 
@@ -256,7 +615,7 @@ function renderProdutos(filtro = ""){
     return `
     <tr>
       <td class="prod">${esc(p.codigo)}</td>
-      <td>${esc(p.nome) || "<span style='color:#9ca3af'>—</span>"}
+      <td>${esc(p.nome) || (arq ? "" : "<span style='color:#9ca3af'>—</span>")}
           <div class="ginfo" data-cod="${esc(p.codigo)}">${arq}</div></td>
       <td>${modelo}</td>
       <td>${tempo}</td>
@@ -272,19 +631,15 @@ document.getElementById("busca").addEventListener("input", e => renderProdutos(e
 async function carregarProdutos(){
   if(!db){ setStatus("⚪ Banco não configurado."); return; }
   setStatus("Carregando produtos…");
-  const [prodRes, gcRes] = await Promise.all([
-    db.from("produtos").select("codigo,nome").order("codigo"),
-    db.from("gcodes").select("produto,arquivo,modelo,tempo_segundos,pecas,linhas")
-  ]);
+  const prodRes = await db.from("produtos").select("codigo,nome").order("codigo");
   if(prodRes.error){ setStatus("Erro: " + prodRes.error.message); console.error(prodRes.error); return; }
   produtos = prodRes.data;
-  gcodeMap = {};
-  if(!gcRes.error) for(const g of gcRes.data) gcodeMap[g.produto] = g;
-  renderProdutos(document.getElementById("busca").value);
+  renderProdutos(document.getElementById("busca").value);  // gcodeMap é preenchido por carregarBulk
   setStatus("");
 }
 
 carregarProdutos();
+carregarBulk();
 </script>
 </body>
 </html>
