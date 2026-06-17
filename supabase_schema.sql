@@ -44,6 +44,7 @@ create table if not exists pedidos (
   produto      text,
   variacao     text,
   quantidade   integer,
+  deadline     date,                        -- data limite de envio (da etiqueta)
   criado_em    timestamptz not null default now()
 );
 

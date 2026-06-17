@@ -40,6 +40,10 @@
   .search{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
           font-size:14px;margin:0 0 14px;background:var(--card)}
   .search:focus{outline:none;border-color:var(--rapida);box-shadow:0 0 0 3px #2563eb22}
+  .pecas-input{width:64px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;
+               font-size:13px;text-align:center}
+  .pecas-input:focus{outline:none;border-color:var(--rapida);box-shadow:0 0 0 3px #2563eb22}
+  .pecas-input.saved{border-color:#16a34a;background:#f0fdf4}
   /* Modal de vínculo */
   .overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;
            align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
@@ -145,6 +149,7 @@
       </div>
       <div class="modal-body">
         <div class="vsec-label">📄 Arquivos — arraste para o produto</div>
+        <input type="search" id="vincBuscaArq" class="search" placeholder="🔍 Filtrar arquivos (gcode)…" style="margin:0 0 10px">
         <div class="filechips" id="vincFiles"></div>
         <input type="search" id="vincBusca" class="search" placeholder="🔍 Filtrar produtos…" style="margin:16px 0 12px">
         <div class="vsec-label">📦 Produtos — solte o arquivo aqui</div>
@@ -402,6 +407,7 @@ function abrirVincular(){
   if(!bulkArquivos.length) return;
   vincAtrib = {};
   document.getElementById("vincBusca").value = "";
+  document.getElementById("vincBuscaArq").value = "";
   renderVincFiles();
   renderVincProds("");
   atualizarVincHint();
@@ -409,10 +415,13 @@ function abrirVincular(){
 }
 document.getElementById("abrirVincular").addEventListener("click", abrirVincular);
 
-// arquivos ainda não atribuídos (chips arrastáveis)
+// arquivos ainda não atribuídos (chips arrastáveis), filtráveis por nome
 function renderVincFiles(){
   const zona = document.getElementById("vincFiles");
-  const livres = bulkArquivos.filter(a => !a.produto && !vincAtrib[a.id]);
+  const fa = norm((document.getElementById("vincBuscaArq").value || "").trim());
+  const livres = bulkArquivos
+    .filter(a => !a.produto && !vincAtrib[a.id])
+    .filter(a => !fa || norm(a.arquivo).includes(fa) || norm(a.modelo).includes(fa));
   zona.innerHTML = livres.map(a => {
     const meta = [a.modelo, a.tempo_segundos != null ? formatTempo(a.tempo_segundos) : null,
                   a.pecas != null ? `${a.pecas}p` : null].filter(Boolean).join(" · ");
@@ -464,6 +473,7 @@ function atualizarVincHint(){
 }
 
 document.getElementById("vincBusca").addEventListener("input", e => renderVincProds(e.target.value));
+document.getElementById("vincBuscaArq").addEventListener("input", renderVincFiles);
 
 // ---- Drag and drop ----
 const vincFilesZone = document.getElementById("vincFiles");
@@ -610,7 +620,10 @@ function renderProdutos(filtro = ""){
     const g = gcodeMap[p.codigo];
     const modelo = g && g.modelo ? esc(g.modelo) : "—";
     const tempo = g && g.tempo_segundos != null ? formatTempo(g.tempo_segundos) : "—";
-    const pecas = g && g.pecas != null ? g.pecas : "—";
+    const pecas = g
+      ? `<input class="pecas-input" type="number" min="1" step="1" data-cod="${esc(p.codigo)}"
+           value="${g.pecas != null ? g.pecas : ""}" placeholder="—" title="Editar nº de peças">`
+      : "—";
     const arq = g && g.arquivo ? `📄 ${esc(g.arquivo)}` : "";
     return `
     <tr>
@@ -627,6 +640,21 @@ function renderProdutos(filtro = ""){
 }
 
 document.getElementById("busca").addEventListener("input", e => renderProdutos(e.target.value));
+
+// Editar nº de peças por gcode (salva em gcode_arquivos do produto vinculado)
+document.getElementById("tbody").addEventListener("change", async e => {
+  const inp = e.target.closest(".pecas-input");
+  if(!inp || !db) return;
+  const cod = inp.dataset.cod;
+  const val = inp.value.trim() === "" ? null : Math.max(1, parseInt(inp.value, 10) || 1);
+  if(val != null) inp.value = val;
+  inp.classList.remove("saved");
+  const { error } = await db.from("gcode_arquivos").update({ pecas: val }).eq("produto", cod);
+  if(error){ setStatus("Erro ao salvar peças: " + error.message); console.error(error); return; }
+  if(gcodeMap[cod]) gcodeMap[cod].pecas = val;
+  inp.classList.add("saved");
+  setStatus(`✅ ${cod}: ${val ?? "—"} peça(s)/placa salvo.`);
+});
 
 async function carregarProdutos(){
   if(!db){ setStatus("⚪ Banco não configurado."); return; }

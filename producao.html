@@ -49,6 +49,10 @@
   .job .jp{font-weight:600;word-break:break-word}
   .job .jv{color:var(--muted);font-size:12px}
   .job .jt{white-space:nowrap;color:#374151;font-variant-numeric:tabular-nums}
+  .psum{padding:10px 16px;background:#f0f9ff;border-top:1px solid var(--line)}
+  .psum-h{font-size:13px;font-weight:700;color:#075985;margin:0 0 6px}
+  .psum-r{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;color:#1f2937}
+  .psum-r .psum-q{white-space:nowrap;color:#0369a1;font-weight:600;font-variant-numeric:tabular-nums}
   .printer .idle{padding:8px 16px;font-size:12px;color:var(--muted);background:#fafafa;border-top:1px solid var(--line)}
   .warn{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin:20px 0 0}
   .warn h3{margin:0 0 8px;font-size:14px;color:#92400e}
@@ -205,8 +209,10 @@ async function distribuir(){
     let N = g.N;
     if(N == null || N < 1){ N = 1; pecasDesc.add(produto); }
     const totalPlacas = Math.ceil(qty / N);
-    for(let i = 1; i <= totalPlacas; i++)
-      jobs.push({ produto, variacao, T: g.T, placa: i, totalPlacas, N, qty });
+    for(let i = 1; i <= totalPlacas; i++){
+      const pecasPlaca = Math.min(N, qty - (i - 1) * N);   // última placa pode ser parcial
+      jobs.push({ produto, variacao, T: g.T, placa: i, totalPlacas, N, qty, pecasPlaca });
+    }
   }
 
   render({ dia, K, jobs, semTempo, pecasDesc });
@@ -224,9 +230,11 @@ function render({ dia, K, jobs, semTempo, pecasDesc }){
   const printers = jobs.length ? distribuirLPT(jobs, K) : [];
   const makespan = printers.reduce((mx, p) => Math.max(mx, p.carga), 0);
   const totalImpressao = jobs.reduce((s, j) => s + j.T, 0);
+  const totalItens = jobs.reduce((s, j) => s + j.pecasPlaca, 0);
 
   let html = `<div class="summary">
     <div class="stat big"><div class="v">${formatTempo(makespan)}</div><div class="l">⏱ Termina em (makespan)</div></div>
+    <div class="stat"><div class="v">${totalItens}</div><div class="l">📦 Itens a imprimir</div></div>
     <div class="stat"><div class="v">${jobs.length}</div><div class="l">🧱 Placas (jobs)</div></div>
     <div class="stat"><div class="v">${K}</div><div class="l">🖨️ Impressoras</div></div>
     <div class="stat"><div class="v">${formatTempo(totalImpressao)}</div><div class="l">Σ Tempo de impressão</div></div>
@@ -243,10 +251,27 @@ function render({ dia, K, jobs, semTempo, pecasDesc }){
       if(!p.jobs.length){
         html += `<div class="idle">Sem jobs.</div>`;
       }else{
+        // resumo: itens (peças) por produto+variação nesta impressora
+        const porProd = new Map();
+        for(const j of p.jobs){
+          const key = j.produto + " ||| " + (j.variacao ?? "");
+          const cur = porProd.get(key) || { produto: j.produto, variacao: j.variacao, itens: 0, placas: 0 };
+          cur.itens += j.pecasPlaca; cur.placas += 1;
+          porProd.set(key, cur);
+        }
+        const totalItens = [...porProd.values()].reduce((s, r) => s + r.itens, 0);
+        html += `<div class="psum"><div class="psum-h">📦 ${totalItens} itens a imprimir</div>`;
+        for(const r of porProd.values()){
+          const vstr = r.variacao ? ` · ${esc(r.variacao)}` : "";
+          html += `<div class="psum-r"><span>${esc(r.produto)}${vstr}</span>
+            <span class="psum-q">${r.itens} un · ${r.placas} placa(s)</span></div>`;
+        }
+        html += `</div>`;
+        // fila de impressão (ordem em que a máquina vai rodar)
         for(const j of ordenarFila(p.jobs)){
           const vstr = j.variacao ? ` · ${esc(j.variacao)}` : "";
           html += `<div class="job">
-            <div><span class="jp">${esc(j.produto)}</span><span class="jv">${vstr} · placa ${j.placa}/${j.totalPlacas}</span></div>
+            <div><span class="jp">${esc(j.produto)}</span><span class="jv">${vstr} · placa ${j.placa}/${j.totalPlacas} · ${j.pecasPlaca} pç</span></div>
             <div class="jt">${formatTempo(j.T)}</div>
           </div>`;
         }

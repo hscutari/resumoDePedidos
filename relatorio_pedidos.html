@@ -326,12 +326,15 @@ async function processar(sources){
       const pageText = lines.join("\n");
       const item = parseItem(lines);
       if(!item) continue;
+      const md = pageText.match(/Deadline:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+      const deadline = md ? `${md[3]}-${md[2]}-${md[1]}` : null;   // DD/MM/YYYY -> ISO
       linhas.push({
         pedido: (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)",
         origem: classify(pageText),
         produto: item.prod,
         varia: descricaoVariacao(item.varia),
-        qty: item.qty * multiplicadorVariacao(item.varia)
+        qty: item.qty * multiplicadorVariacao(item.varia),
+        deadline
       });
       if(p % 25 === 0) setStatus(`${src.name}: página ${p}/${pdf.numPages}…`);
     }
@@ -386,7 +389,7 @@ async function inserirPedidos(novas){
   await db.from("produtos").upsert(produtos, {onConflict:"codigo", ignoreDuplicates:true});
   const rows = novas.map(l => ({
     relatorio_id: rel.id, pedido:l.pedido, origem:l.origem,
-    produto:l.produto, variacao:l.varia, quantidade:l.qty
+    produto:l.produto, variacao:l.varia, quantidade:l.qty, deadline:l.deadline ?? null
   }));
   for(let i=0; i<rows.length; i+=500){
     const { error } = await db.from("pedidos").insert(rows.slice(i, i+500));
