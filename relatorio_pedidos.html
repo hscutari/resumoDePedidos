@@ -6,6 +6,9 @@
 <title>Relatório de Produção — Shopee / Rápida / TikTok</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
 <style>
   :root{
     --shopee:#ee4d2d; --rapida:#2563eb; --tiktok:#111; --bg:#f5f6f8; --card:#fff;
@@ -60,10 +63,11 @@
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
   .warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:10px 14px;
         border-radius:8px;font-size:13px;margin:12px 0}
-  .daybar{display:flex;justify-content:flex-end;align-items:center;gap:8px;
+  .daybar{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;
           margin:10px 0 0;font-size:13px;color:var(--muted)}
-  .daybar input{padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+  .daybar input,.daybar select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;
                 font-size:14px;background:var(--card);cursor:pointer}
+  .daybar label{display:flex;align-items:center;gap:5px}
   .urlbox{margin-top:14px}
   .urlbox label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
   .urlbox textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;
@@ -121,6 +125,7 @@
   <div class="header-actions">
     <a class="navlink" href="produtos.html">📦 Produtos</a>
     <a class="navlink" href="producao.html">🖨️ Produção</a>
+    <a class="navlink" href="vendas_grafico.html">📈 Vendas</a>
     <button id="wipe" class="btn-danger" title="Apaga todos os pedidos do banco (hard delete)">🗑️ Limpar dados</button>
   </div>
 </header>
@@ -149,8 +154,14 @@ https://github.com/usuario/repositorio/tree/main/pdfs"></textarea>
   <div id="dbstatus" class="hint"></div>
   <div id="status"></div>
   <div class="daybar">
-    <span>📅 Ver vendas do dia:</span>
-    <input type="date" id="dataSel">
+    <span>📅 Ver vendas por</span>
+    <select id="campoData">
+      <option value="criado_em">Importação</option>
+      <option value="deadline">Deadline</option>
+    </select>
+    <label id="lblRange">Período <input type="text" id="dataRange" placeholder="Selecione data(s)…" readonly style="cursor:pointer;min-width:210px"></label>
+    <select id="importSel" title="Escolha uma importação"></select>
+    <button id="aplicarData" class="secondary">Ver</button>
   </div>
   <div id="report"></div>
 </main>
@@ -399,36 +410,53 @@ async function inserirPedidos(novas){
 
 const formatarData = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
 
-// Carrega do banco as vendas importadas em um DIA específico (YYYY-MM-DD, hora local)
-async function carregarVendasDaData(diaISO){
+// Carrega do banco as vendas num PERÍODO [deISO, ateISO], filtrando por
+// "criado_em" (data de importação) ou "deadline" (data limite de envio).
+async function carregarVendas(campo, deISO, ateISO){
   if(!db) return [];
-  const [y, m, d] = diaISO.split("-").map(Number);
-  const inicio = new Date(y, m - 1, d).toISOString();
-  const fim = new Date(y, m - 1, d + 1).toISOString();   // até a meia-noite do dia seguinte
+  const aplicarFiltro = campo === "deadline"
+    ? qb => qb.gte("deadline", deISO).lte("deadline", ateISO)        // coluna date
+    : (() => {                                                       // timestamptz -> faixa local
+        const [y, m, d]   = deISO.split("-").map(Number);
+        const [yA, mA, dA] = ateISO.split("-").map(Number);
+        const inicio = new Date(y, m - 1, d).toISOString();
+        const fim    = new Date(yA, mA - 1, dA + 1).toISOString();   // até a meia-noite do dia seguinte
+        return qb => qb.gte("criado_em", inicio).lt("criado_em", fim);
+      })();
   const linhas = [];
   const tam = 1000;
   for(let from = 0; ; from += tam){
-    const { data, error } = await db.from("pedidos")
-      .select("pedido,origem,produto,variacao,quantidade")
-      .gte("criado_em", inicio).lt("criado_em", fim)
+    const qb = aplicarFiltro(db.from("pedidos")
+      .select("pedido,origem,produto,variacao,quantidade,deadline"))
       .order("id", { ascending: true })
       .range(from, from + tam - 1);
-    if(error){ console.error("carregarVendasDaData:", error); break; }
+    const { data, error } = await qb;
+    if(error){ console.error("carregarVendas:", error); break; }
     linhas.push(...data.map(r => ({
-      pedido: r.pedido, origem: r.origem, produto: r.produto, varia: r.variacao, qty: r.quantidade
+      pedido: r.pedido, origem: r.origem, produto: r.produto, varia: r.variacao,
+      qty: r.quantidade, deadline: r.deadline
     })));
     if(data.length < tam) break;
   }
   return linhas;
 }
 
-// Exibe na tela as vendas (e estoque) de um dia
-async function mostrarDia(diaISO){
+function rotuloPeriodo(campo, deISO, ateISO){
+  const nome = campo === "deadline" ? "deadline" : "importação";
+  return deISO === ateISO
+    ? `${nome} ${formatarData(deISO)}`
+    : `${nome} ${formatarData(deISO)}–${formatarData(ateISO)}`;
+}
+
+// Exibe na tela as vendas (e estoque) de um período
+async function mostrarPeriodo(campo, deISO, ateISO){
   if(!db) return;
-  dataAtual = diaISO;
-  setStatus(`Carregando vendas de ${formatarData(diaISO)}…`);
+  if(ateISO < deISO) ateISO = deISO;       // normaliza range invertido
+  dataAtual = deISO;                        // estoque diário ancorado no início do período
+  const rotulo = rotuloPeriodo(campo, deISO, ateISO);
+  setStatus(`Carregando vendas (${rotulo})…`);
   estoqueSalvo = await carregarEstoque();
-  const linhas = await carregarVendasDaData(diaISO);
+  const linhas = await carregarVendas(campo, deISO, ateISO);
   if(linhas.length){
     resultado = agregarLinhas(linhas);
     render(resultado);
@@ -438,8 +466,11 @@ async function mostrarDia(diaISO){
     document.getElementById("report").innerHTML = "";
     txtBtn.disabled = csvBtn.disabled = true;
   }
-  setStatus(`📅 ${formatarData(diaISO)}${diaISO === hojeISO() ? " (hoje)" : ""}: ${linhas.length} venda(s).`);
+  setStatus(`📅 ${rotulo}: ${linhas.length} venda(s).`);
 }
+
+// Atalho: um único dia por data de importação (usado ao abrir a tela)
+async function mostrarDia(diaISO){ return mostrarPeriodo("criado_em", diaISO, diaISO); }
 
 function ordenar(map){
   return [...map.values()].sort((a,b) =>
@@ -693,7 +724,96 @@ const drop = document.getElementById("drop");
 const input = document.getElementById("input");
 const filesEl = document.getElementById("files");
 const urlsEl = document.getElementById("urls");
-const dataSel = document.getElementById("dataSel");
+const campoData = document.getElementById("campoData");
+const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+// Calendário único com seleção de range (flatpickr)
+const fp = flatpickr("#dataRange", {
+  mode: "range",
+  dateFormat: "Y-m-d",
+  locale: (window.flatpickr && flatpickr.l10ns && flatpickr.l10ns.pt) ? "pt" : "default",
+  onClose: () => aplicarPeriodo()
+});
+// retorna [deISO, ateISO] a partir do range selecionado (1 data = dia único)
+function rangeSelecionado(){
+  const ds = fp.selectedDates;
+  if(!ds.length) return [hojeISO(), hojeISO()];
+  const de = toISO(ds[0]);
+  const ate = toISO(ds[ds.length - 1]);
+  return [de, ate];
+}
+
+const importSel = document.getElementById("importSel");
+let relatoriosMap = {};   // id -> { criado_em, etiquetas, ... }
+
+function formatDataHora(iso){
+  const d = new Date(iso), p = n => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// Mostra/esconde o calendário (deadline) ou o seletor de importações (importação)
+function atualizarModoData(){
+  const importacao = campoData.value === "criado_em";
+  document.getElementById("lblRange").style.display = importacao ? "none" : "";
+  document.getElementById("aplicarData").style.display = importacao ? "none" : "";
+  importSel.style.display = importacao ? "" : "none";
+}
+
+// Lista todas as importações (relatorios) com data/hora, mais recente primeiro
+async function carregarImportacoes(){
+  if(!db) return;
+  const { data, error } = await db.from("relatorios")
+    .select("id,criado_em,etiquetas,total_geral").order("criado_em", { ascending: false });
+  if(error){ console.error("carregarImportacoes:", error); return; }
+  relatoriosMap = {};
+  importSel.innerHTML = (data || []).map(r => {
+    relatoriosMap[r.id] = r;
+    const itens = r.total_geral != null ? ` · ${r.total_geral} itens` : "";
+    return `<option value="${r.id}">${formatDataHora(r.criado_em)} · ${r.etiquetas ?? 0} etiquetas${itens}</option>`;
+  }).join("");
+  if(!data || !data.length) importSel.innerHTML = `<option value="">Nenhuma importação</option>`;
+}
+
+// Carrega os pedidos de UMA importação (relatorio_id)
+async function carregarVendasDoRelatorio(relId){
+  if(!db) return [];
+  const linhas = [];
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("pedido,origem,produto,variacao,quantidade,deadline")
+      .eq("relatorio_id", relId)
+      .order("id", { ascending: true })
+      .range(from, from + tam - 1);
+    if(error){ console.error("carregarVendasDoRelatorio:", error); break; }
+    linhas.push(...data.map(r => ({
+      pedido: r.pedido, origem: r.origem, produto: r.produto, varia: r.variacao,
+      qty: r.quantidade, deadline: r.deadline
+    })));
+    if(data.length < tam) break;
+  }
+  return linhas;
+}
+
+// Exibe na tela as vendas de uma importação específica
+async function mostrarImportacao(relId){
+  if(!db || !relId) return;
+  const info = relatoriosMap[relId];
+  const quando = info ? formatDataHora(info.criado_em) : "";
+  dataAtual = info ? toISO(new Date(info.criado_em)) : hojeISO();   // estoque ancorado no dia do import
+  setStatus(`Carregando importação de ${quando}…`);
+  estoqueSalvo = await carregarEstoque();
+  const linhas = await carregarVendasDoRelatorio(relId);
+  if(linhas.length){
+    resultado = agregarLinhas(linhas);
+    render(resultado);
+    txtBtn.disabled = csvBtn.disabled = false;
+  } else {
+    resultado = null;
+    document.getElementById("report").innerHTML = "";
+    txtBtn.disabled = csvBtn.disabled = true;
+  }
+  setStatus(`📦 Importação ${quando}: ${linhas.length} venda(s).`);
+}
 const goBtn = document.getElementById("go");
 const goUrlBtn = document.getElementById("goUrl");
 const txtBtn = document.getElementById("txt");
@@ -748,7 +868,7 @@ async function run(sources){
   try{
     if(!sources.length){ setStatus("Nada para processar."); return; }
     dataAtual = hojeISO();                       // importação é sempre no dia de hoje
-    if(dataSel) dataSel.value = dataAtual;
+    campoData.value = "criado_em"; atualizarModoData();
     const linhas = await processar(sources);
     setStatus("Verificando vendas já existentes no banco…");
     const { novas, ignoradas } = await filtrarNovas(linhas);
@@ -756,6 +876,8 @@ async function run(sources){
     estoqueSalvo = await carregarEstoque();   // puxa estoque do banco (se configurado)
     resultado = agregarLinhas(novas);         // exibe só as vendas novas
     render(resultado);
+    await carregarImportacoes();                 // atualiza a lista com a nova importação
+    if(importSel.value) importSel.selectedIndex = 0;
     setStatus(db
       ? `✅ ${novas.length} venda(s) nova(s) importada(s) · ${ignoradas} ignorada(s) (já no banco).`
       : `✅ ${linhas.length} item(ns) (banco não configurado — sem deduplicação).`);
@@ -805,19 +927,39 @@ clearBtn.addEventListener("click", () => {
   txtBtn.disabled = csvBtn.disabled = true;
 });
 
-// Calendário: ao escolher uma data, mostra as vendas importadas naquele dia
-if(dataSel){
-  dataSel.max = hojeISO();
-  dataSel.addEventListener("change", () => { if(dataSel.value) mostrarDia(dataSel.value); });
+// Filtro por deadline: aplica ao fechar o calendário, clicar "Ver"
+function aplicarPeriodo(){
+  if(campoData.value !== "deadline") return;
+  const [de, ate] = rangeSelecionado();
+  mostrarPeriodo("deadline", de, ate);
 }
+document.getElementById("aplicarData").addEventListener("click", aplicarPeriodo);
+
+// Troca entre "Importação" (lista de importações) e "Deadline" (calendário range)
+campoData.addEventListener("change", async () => {
+  atualizarModoData();
+  if(campoData.value === "criado_em"){
+    await carregarImportacoes();
+    if(importSel.value) await mostrarImportacao(importSel.value);
+  }else{
+    aplicarPeriodo();
+  }
+});
+
+// Escolher uma importação na lista
+importSel.addEventListener("change", () => { if(importSel.value) mostrarImportacao(importSel.value); });
 
 // Ao abrir a tela: mostra as vendas importadas hoje (do banco)
 (async function initDia(){
   if(!db) return;
-  if(dataSel) dataSel.value = hojeISO();
+  campoData.value = "criado_em";
+  atualizarModoData();
+  fp.setDate([hojeISO(), hojeISO()], false);   // default do calendário (modo deadline)
   try{
-    await mostrarDia(hojeISO());
-  }catch(err){ setStatus("Erro ao carregar vendas do dia: " + err.message); console.error(err); }
+    await carregarImportacoes();
+    if(importSel.value){ importSel.selectedIndex = 0; await mostrarImportacao(importSel.value); }
+    else setStatus("Nenhuma importação ainda. Importe PDFs acima.");
+  }catch(err){ setStatus("Erro ao carregar importações: " + err.message); console.error(err); }
 })();
 </script>
 </body>
