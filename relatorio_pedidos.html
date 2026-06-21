@@ -229,7 +229,7 @@ function removerEstoque(origem, produto, variacao){
 
 
 // --- mesmas regras do script Python ---
-const LINE_RE = /^\s*1\s*\.\s*(.+?)\s*(?:\(\s*\*\s*(\d+)\s*\)|\*\s*(\d+))\s*$/;
+const LINE_RE = /^\s*\d+\s*\.\s*(.+?)\s*(?:\(\s*\*\s*(\d+)\s*\)|\*\s*(\d+))\s*$/;
 const PROD_VAR_RE = /^(.+?)\((.+)\)\s*$/;
 const RAPIDA_RE = /ENTREGA\s+RAPIDA/i;
 
@@ -248,17 +248,19 @@ function classify(pageText){
   return "OUTROS";
 }
 
-function parseItem(lines){
+// Retorna TODOS os itens da etiqueta (cada linha "N. produto (variação) *qtd").
+function parseItems(lines){
+  const itens = [];
   for(const ln of lines){
     const m = ln.match(LINE_RE);
     if(!m) continue;
     const desc = m[1].replace(/\s{2,}/g," ").trim();
     const qty = parseInt(m[2] || m[3], 10);
     const pv = desc.match(PROD_VAR_RE);
-    if(pv) return {prod:pv[1].trim(), varia:pv[2].trim(), qty};
-    return {prod:desc, varia:"(sem variação)", qty};
+    itens.push(pv ? {prod:pv[1].trim(), varia:pv[2].trim(), qty}
+                  : {prod:desc, varia:"(sem variação)", qty});
   }
-  return null;
+  return itens;
 }
 
 // A variação pode embutir um multiplicador: "x,descrição" ou "descrição,x" (x = número).
@@ -335,18 +337,21 @@ async function processar(sources){
       const tc = await page.getTextContent();
       const lines = buildLines(tc);
       const pageText = lines.join("\n");
-      const item = parseItem(lines);
-      if(!item) continue;
+      const itens = parseItems(lines);
+      if(!itens.length) continue;
       const md = pageText.match(/Deadline:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
       const deadline = md ? `${md[3]}-${md[2]}-${md[1]}` : null;   // DD/MM/YYYY -> ISO
-      linhas.push({
-        pedido: (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)",
-        origem: classify(pageText),
-        produto: item.prod,
-        varia: descricaoVariacao(item.varia),
-        qty: item.qty * multiplicadorVariacao(item.varia),
-        deadline
-      });
+      const pedido = (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)";
+      const origem = classify(pageText);
+      for(const item of itens){
+        linhas.push({
+          pedido, origem,
+          produto: item.prod,
+          varia: descricaoVariacao(item.varia),
+          qty: item.qty * multiplicadorVariacao(item.varia),
+          deadline
+        });
+      }
       if(p % 25 === 0) setStatus(`${src.name}: página ${p}/${pdf.numPages}…`);
     }
   }
