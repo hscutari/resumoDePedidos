@@ -69,6 +69,14 @@ create table if not exists gcode_arquivos (
 
 create index if not exists idx_gcode_arquivos_produto on gcode_arquivos(produto);
 
+-- 7) Usuários do painel (login + senha em hash SHA-256) -------
+create table if not exists usuarios (
+  login       text primary key,
+  nome        text,
+  senha_hash  text not null,
+  criado_em   timestamptz not null default now()
+);
+
 -- ============================================================
 -- Segurança (RLS)
 -- Para uma ferramenta interna simples, liberamos acesso via a
@@ -81,6 +89,7 @@ alter table estoque        enable row level security;
 alter table relatorios     enable row level security;
 alter table pedidos        enable row level security;
 alter table gcode_arquivos enable row level security;
+alter table usuarios       enable row level security;
 
 -- Políticas permissivas para o papel anon (acesso total)
 create policy "anon_all_produtos"   on produtos   for all to anon using (true) with check (true);
@@ -88,3 +97,4 @@ create policy "anon_all_estoque"    on estoque    for all to anon using (true) w
 create policy "anon_all_relatorios" on relatorios for all to anon using (true) with check (true);
 create policy "anon_all_pedidos"    on pedidos    for all to anon using (true) with check (true);
 create policy "anon_all_gcode_arquivos" on gcode_arquivos for all to anon using (true) with check (true);
+create policy "anon_all_usuarios"   on usuarios   for all to anon using (true) with check (true);

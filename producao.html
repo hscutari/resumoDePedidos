@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Produção — Distribuição nas impressoras</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <style>
   :root{ --rapida:#2563eb; --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --txt:#1f2937; --muted:#6b7280; }
   *{box-sizing:border-box}
@@ -44,8 +45,9 @@
   .printer .ph .tot{font-size:13px;font-weight:700;color:var(--rapida)}
   .printer .bar{height:6px;background:#e5e7eb}
   .printer .bar > i{display:block;height:100%;background:var(--rapida)}
-  .job{display:flex;justify-content:space-between;gap:10px;padding:9px 16px;border-top:1px solid var(--line);font-size:13px}
+  .job{display:flex;justify-content:space-between;gap:10px;padding:9px 16px;border-top:1px solid var(--line);font-size:13px;transition:background .08s}
   .job:first-child{border-top:0}
+  .job.hl{background:#dcfce7}
   .job .jp{font-weight:600;word-break:break-word}
   .job .jv{color:var(--muted);font-size:12px}
   .job .jt{white-space:nowrap;color:#374151;font-variant-numeric:tabular-nums}
@@ -71,7 +73,9 @@
   <div class="navactions">
     <a class="navlink" href="produtos.html">📦 Produtos</a>
     <a class="navlink" href="vendas_grafico.html">📈 Vendas</a>
+    <a class="navlink" href="usuarios.html">👤 Usuários</a>
     <a class="navlink" href="relatorio_pedidos.html">← Voltar ao resumo</a>
+    <button class="navlink" style="border:0;cursor:pointer" onclick="Auth.logout()">Sair</button>
   </div>
 </header>
 <main>
@@ -100,6 +104,7 @@ const db = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const escAttr = s => esc(s).replace(/"/g, "&quot;");
 const setStatus = s => document.getElementById("status").textContent = s;
 
 const hojeISO = () => {
@@ -271,7 +276,7 @@ function render({ dia, K, jobs, semTempo, pecasDesc }){
         // fila de impressão (ordem em que a máquina vai rodar)
         for(const j of ordenarFila(p.jobs)){
           const vstr = j.variacao ? ` · ${esc(j.variacao)}` : "";
-          html += `<div class="job">
+          html += `<div class="job" data-prod="${escAttr(j.produto)}">
             <div><span class="jp">${esc(j.produto)}</span><span class="jv">${vstr} · placa ${j.placa}/${j.totalPlacas} · ${j.pecasPlaca} pç</span></div>
             <div class="jt">${formatTempo(j.T)}</div>
           </div>`;
@@ -299,6 +304,22 @@ function render({ dia, K, jobs, semTempo, pecasDesc }){
 }
 
 document.getElementById("distribuir").addEventListener("click", distribuir);
+
+// Realça todas as linhas do mesmo produto (em qualquer impressora) ao passar o cursor
+const resultadoEl = document.getElementById("resultado");
+function realcar(prod, on){
+  if(prod == null) return;
+  resultadoEl.querySelectorAll(`.job[data-prod="${CSS.escape(prod)}"]`)
+    .forEach(el => el.classList.toggle("hl", on));
+}
+resultadoEl.addEventListener("mouseover", e => {
+  const job = e.target.closest(".job");
+  if(job) realcar(job.dataset.prod, true);
+});
+resultadoEl.addEventListener("mouseout", e => {
+  const job = e.target.closest(".job");
+  if(job) realcar(job.dataset.prod, false);
+});
 
 // init
 (function(){

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vendas por dia — Gráfico</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -66,7 +67,9 @@
   <div class="navactions">
     <a class="navlink" href="produtos.html">📦 Produtos</a>
     <a class="navlink" href="producao.html">🖨️ Produção</a>
+    <a class="navlink" href="usuarios.html">👤 Usuários</a>
     <a class="navlink" href="relatorio_pedidos.html">← Resumo</a>
+    <button class="navlink" style="border:0;cursor:pointer" onclick="Auth.logout()">Sair</button>
   </div>
 </header>
 <main>

@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Entrar — Resumo de Pedidos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <style>
   :root{
     --shopee:#ee4d2d; --rapida:#2563eb; --bg:#f5f6f8; --card:#fff;
@@ -24,6 +26,8 @@
   button{width:100%;margin-top:22px;border:0;border-radius:9px;padding:12px;
          font-size:15px;font-weight:700;color:#fff;background:#111827;cursor:pointer}
   button:hover{background:#000}
+  button:disabled{opacity:.6;cursor:default}
+  .erro{margin-top:14px;font-size:13px;color:#b91c1c;min-height:18px}
 </style>
 </head>
 <body>
@@ -37,14 +41,34 @@
     <label for="pass">Senha</label>
     <input type="password" id="pass" name="pass" autocomplete="current-password" placeholder="sua senha">
 
-    <button type="submit">Entrar</button>
+    <button type="submit" id="btnEntrar">Entrar</button>
+    <div class="erro" id="erro"></div>
   </form>
 
 <script>
-  // Sem validação por enquanto: ao enviar, vai direto para o resumo de vendas.
-  document.getElementById("loginForm").addEventListener("submit", e => {
+  const DESTINO = "relatorio_pedidos.html";
+  // Se já está logado, pula direto para o painel
+  if(window.Auth && Auth.sessao()) window.location.replace(DESTINO);
+
+  const form = document.getElementById("loginForm");
+  const erro = document.getElementById("erro");
+  const btn = document.getElementById("btnEntrar");
+
+  form.addEventListener("submit", async e => {
     e.preventDefault();
-    window.location.href = "relatorio_pedidos.html";
+    erro.textContent = "";
+    const usuario = document.getElementById("user").value.trim();
+    const senha = document.getElementById("pass").value;
+    if(!usuario || !senha){ erro.textContent = "Preencha usuário e senha."; return; }
+    btn.disabled = true; btn.textContent = "Entrando…";
+    try{
+      const ok = await Auth.login(usuario, senha);
+      if(ok){ window.location.replace(DESTINO); }
+      else { erro.textContent = "Usuário ou senha inválidos."; btn.disabled = false; btn.textContent = "Entrar"; }
+    }catch(err){
+      erro.textContent = "Erro ao entrar: " + err.message;
+      btn.disabled = false; btn.textContent = "Entrar";
+    }
   });
 </script>
 </body>

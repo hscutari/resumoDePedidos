@@ -6,6 +6,7 @@
 <title>Relatório de Produção — Shopee / Rápida / TikTok</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
@@ -126,7 +127,9 @@
     <a class="navlink" href="produtos.html">📦 Produtos</a>
     <a class="navlink" href="producao.html">🖨️ Produção</a>
     <a class="navlink" href="vendas_grafico.html">📈 Vendas</a>
+    <a class="navlink" href="usuarios.html">👤 Usuários</a>
     <button id="wipe" class="btn-danger" title="Apaga todos os pedidos do banco (hard delete)">🗑️ Limpar dados</button>
+    <button class="navlink" style="border:0;cursor:pointer" onclick="Auth.logout()">Sair</button>
   </div>
 </header>
 <main>
