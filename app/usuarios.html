@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Usuários — Resumo de Pedidos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/auth.js"></script>
+<style>
+  :root{
+    --rapida:#6d5efc; --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --line:#eceef4;
+    --txt:#1a1d29; --muted:#7c8398; --accent:#6d5efc; --accent2:#9b8cff;
+    --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       margin:0;background:var(--bg);color:var(--txt)}
+
+  /* ===== Shell fintech: rail + content ===== */
+  .wrap{display:flex;min-height:100vh}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px;font-size:15px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a,.nav button{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover,.nav button:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:980px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}
+  .topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .topactions{display:flex;gap:10px;align-items:center}
+  .whoami{display:flex;align-items:center;gap:8px;background:#fff;border-radius:999px;padding:7px 14px;box-shadow:var(--shadow);font-size:13px;font-weight:600;color:#3a4055}
+  .dbstatus{font-size:18px;cursor:default}
+
+  #status{font-size:13px;color:var(--muted);margin:0 0 16px}
+
+  .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:0 0 18px;overflow:hidden}
+  .card h2{margin:0;font-size:15px;padding:15px 20px;border-bottom:1px solid var(--line)}
+  .card .pb{padding:18px 20px}
+  .form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .field input{padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fafbff;color:var(--txt);min-width:180px}
+  .field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  button.go{border:0;border-radius:11px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;
+            background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(109,94,252,.3)}
+  button.go:hover{filter:brightness(1.05)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:10px 16px;background:#fafbff}
+  td{padding:12px 16px;border-top:1px solid var(--line);vertical-align:middle}
+  td.acao{text-align:right;white-space:nowrap;width:1%}
+  .btn-del{border:0;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#b91c1c}
+  .btn-del:disabled{opacity:.45;cursor:default}
+  .msg{font-size:13px;margin-top:10px;min-height:18px}
+  .msg.ok{color:#166534}.msg.err{color:#b91c1c}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} .field input{min-width:140px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a href="dashboard.html">🏠<span class="lbl">Início</span></a>
+      <a href="relatorio_pedidos.html">📋<span class="lbl">Resumo</span></a>
+      <a href="produtos.html">📦<span class="lbl">Produtos</span></a>
+      <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
+      <a href="vendas_grafico.html">📈<span class="lbl">Vendas</span></a>
+      <a class="active">👤<span class="lbl">Usuários</span></a>
+    </nav>
+    <button id="sair">⎋<span class="lbl">Sair</span></button>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div><h1>👤 Usuários</h1><p>Quem tem acesso ao painel — crie e remova logins</p></div>
+      <div class="topactions">
+        <span class="whoami" id="quem"></span>
+        <span class="dbstatus" id="dbstatus" title="Status do banco">⚪</span>
+      </div>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="card">
+      <h2>Novo usuário</h2>
+      <div class="pb">
+        <form class="form" id="formNovo">
+          <div class="field"><label>Login</label><input id="nLogin" placeholder="ex.: joao" autocomplete="off"></div>
+          <div class="field"><label>Nome</label><input id="nNome" placeholder="Nome completo" autocomplete="off"></div>
+          <div class="field"><label>Senha</label><input id="nSenha" type="password" placeholder="senha" autocomplete="new-password"></div>
+          <button class="go" type="submit">Adicionar</button>
+        </form>
+        <div class="msg" id="msgNovo"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Usuários cadastrados</h2>
+      <table>
+        <thead><tr><th>Login</th><th>Nome</th><th>Criado em</th><th class="acao">Ação</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div></section>
+</div>
+
+<script>
+const db = Auth.db;
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const setStatus = s => document.getElementById("status").textContent = s;
+const fmtDataHora = iso => { const d=new Date(iso),p=n=>String(n).padStart(2,"0");
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+
+const sessao = Auth.sessao();
+document.getElementById("quem").textContent = sessao ? `👤 ${sessao.nome || sessao.login}` : "";
+document.getElementById("sair").addEventListener("click", () => Auth.logout());
+
+const dbel = document.getElementById("dbstatus");
+dbel.textContent = db ? "🟢" : "⚪";
+dbel.title = db ? "Banco conectado (Supabase)" : "Banco não configurado";
+
+let usuarios = [];
+
+async function carregar(){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  const { data, error } = await db.from("usuarios").select("login,nome,criado_em").order("login");
+  if(error){ setStatus("Erro: " + error.message); return; }
+  usuarios = data || [];
+  render();
+  setStatus(`${usuarios.length} usuário(s).`);
+}
+
+function render(){
+  const tbody = document.getElementById("tbody");
+  const meu = sessao ? sessao.login : null;
+  tbody.innerHTML = usuarios.map(u => {
+    const ehEu = u.login === meu;
+    return `<tr>
+      <td><strong>${esc(u.login)}</strong>${ehEu ? " <span style='color:#9ca3af'>(você)</span>" : ""}</td>
+      <td>${esc(u.nome) || "—"}</td>
+      <td>${u.criado_em ? fmtDataHora(u.criado_em) : "—"}</td>
+      <td class="acao"><button class="btn-del" data-login="${esc(u.login)}" ${ehEu ? "disabled title='Não dá para excluir o usuário logado'" : ""}>🗑️ Excluir</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="4" style="color:#6b7280;font-style:italic;text-align:center;padding:24px">Nenhum usuário.</td></tr>`;
+}
+
+// Adicionar usuário
+document.getElementById("formNovo").addEventListener("submit", async e => {
+  e.preventDefault();
+  const msg = document.getElementById("msgNovo");
+  msg.className = "msg"; msg.textContent = "";
+  const login = document.getElementById("nLogin").value.trim();
+  const nome = document.getElementById("nNome").value.trim();
+  const senha = document.getElementById("nSenha").value;
+  if(!login || !senha){ msg.className = "msg err"; msg.textContent = "Login e senha são obrigatórios."; return; }
+  if(usuarios.some(u => u.login === login)){ msg.className = "msg err"; msg.textContent = "Já existe um usuário com esse login."; return; }
+  try{
+    const senha_hash = await Auth.sha256(senha);
+    const { error } = await db.from("usuarios").insert({ login, nome: nome || null, senha_hash });
+    if(error) throw error;
+    document.getElementById("nLogin").value = "";
+    document.getElementById("nNome").value = "";
+    document.getElementById("nSenha").value = "";
+    msg.className = "msg ok"; msg.textContent = `✅ Usuário "${login}" criado.`;
+    await carregar();
+  }catch(err){ msg.className = "msg err"; msg.textContent = "Erro: " + err.message; }
+});
+
+// Excluir usuário
+document.getElementById("tbody").addEventListener("click", async e => {
+  const btn = e.target.closest(".btn-del");
+  if(!btn) return;
+  const login = btn.dataset.login;
+  if(!confirm(`Excluir o usuário "${login}"?`)) return;
+  const { error } = await db.from("usuarios").delete().eq("login", login);
+  if(error){ setStatus("Erro ao excluir: " + error.message); return; }
+  await carregar();
+});
+
+carregar();
+</script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Início — HS3DLab</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/auth.js"></script>
+<style>
+  :root{
+    --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --ink:#1a1d29; --muted:#7c8398;
+    --line:#eceef4; --accent:#6d5efc; --accent2:#9b8cff;
+    --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       background:var(--bg);color:var(--ink)}
+  .wrap{display:flex;min-height:100vh}
+
+  /* Sidebar de ícones redondos */
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px 0;
+        position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+         font-weight:800;font-size:17px;box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:10px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;
+         transition:.15s;border:2px solid transparent}
+  .nav a:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);
+                box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;
+              font-size:12px;padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;
+              transform:translateX(-4px);transition:.15s;z-index:5}
+  .nav a:hover .lbl{opacity:1;transform:translateX(0)}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow);
+          cursor:pointer;border:0;font-size:14px}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:1500px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}
+  .topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  #status{font-size:12px;color:var(--muted)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:22px}
+  .balcard{border-radius:20px;padding:20px;color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .balcard .tag{font-size:12px;opacity:.9}
+  .balcard .big{font-size:28px;font-weight:800;margin:10px 0 2px}
+  .balcard .sub{font-size:12px;opacity:.85}
+  .balcard .chip{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;
+                 background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:18px}
+  .c-shopee{background:linear-gradient(135deg,#ff5a3c,#ff8566)}
+  .c-rapida{background:linear-gradient(135deg,#2f7bff,#6aa6ff)}
+  .c-tiktok{background:linear-gradient(135deg,#10b3a3,#3ad6c2)}
+  .c-total{background:linear-gradient(135deg,#2a2f45,#4b5270)}
+
+  .grid2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px}
+  .panel{background:var(--card);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 2px;font-size:15px}
+  .panel .hint{color:var(--muted);font-size:12px;margin:0 0 14px}
+  .chart{width:100%;height:240px;display:block}
+
+  .limit{margin:14px 0}
+  .limit .row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+  .bar{height:9px;border-radius:6px;background:#eef0f7;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:6px}
+
+  .tablecard table{width:100%;border-collapse:collapse;font-size:13px}
+  .tablecard th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;
+                letter-spacing:.04em;padding:8px 10px}
+  .tablecard td{padding:11px 10px;border-top:1px solid var(--line)}
+  .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+  .p-SHOPEE{background:#ffe9e3;color:#d83a1d}.p-RAPIDA{background:#e4eeff;color:#2f7bff}
+  .p-TIKTOK{background:#dcf6f2;color:#0d8c80}.p-OUTROS{background:#eef0f7;color:#5b6276}
+  .dot{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;background:#f1f2f8;font-size:14px}
+  .vazio{color:var(--muted);font-style:italic;padding:18px;text-align:center}
+  .delta-up{color:#dcfce7}.delta-down{color:#fee2e2}
+
+  @media(max-width:820px){ .grid2{grid-template-columns:1fr} .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a class="active" title="Início">🏠<span class="lbl">Início</span></a>
+      <a href="relatorio_pedidos.html">📋<span class="lbl">Resumo</span></a>
+      <a href="produtos.html">📦<span class="lbl">Produtos</span></a>
+      <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
+      <a href="vendas_grafico.html">📈<span class="lbl">Vendas</span></a>
+      <a href="usuarios.html">👤<span class="lbl">Usuários</span></a>
+    </nav>
+    <button class="avatar" id="sair" title="Sair">⎋</button>
+  </aside>
+
+  <section class="content">
+   <div class="inner">
+    <div class="topbar">
+      <div>
+        <h1 id="ola">Olá 👋</h1>
+        <p id="subtitulo">Resumo de produção</p>
+      </div>
+      <div id="status">Carregando…</div>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Vendas por dia</h2>
+        <p class="hint">Itens por dia — últimos 7 dias (por importação)</p>
+        <svg class="chart" id="chart"></svg>
+      </div>
+      <div class="panel">
+        <h2>Produção hoje</h2>
+        <p class="hint" id="prodHint">Carga por impressora</p>
+        <div id="prod"></div>
+      </div>
+    </div>
+
+    <div class="panel tablecard">
+      <h2>Mais vendidos hoje</h2>
+      <p class="hint">Top produtos por itens</p>
+      <table>
+        <thead><tr><th></th><th>Produto</th><th>Plataforma</th><th>Itens</th><th>Placas</th></tr></thead>
+        <tbody id="top"></tbody>
+      </table>
+    </div>
+   </div>
+  </section>
+</div>
+
+<script>
+const db = Auth.db;
+const sessao = Auth.sessao();
+document.getElementById("sair").addEventListener("click", () => Auth.logout());
+
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const setStatus = s => document.getElementById("status").textContent = s;
+const LABELS = { SHOPEE:"Shopee", RAPIDA:"Entrega Rápida", TIKTOK:"TikTok", OUTROS:"Outros" };
+const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const hojeISO = () => toISO(new Date());
+const fmtDiaCurto = iso => { const [,m,d] = iso.split("-"); return `${d}/${m}`; };
+function formatTempo(seg){
+  if(seg == null) return "—";
+  const h = Math.floor(seg/3600), m = Math.round((seg%3600)/60);
+  return (h ? h+"h " : "") + (m || !h ? m+"m" : "");
+}
+const K = Math.max(1, parseInt(localStorage.getItem("hs3d_k"), 10) || 3);
+
+// saudação
+(function(){
+  const nome = sessao ? (sessao.nome || sessao.login) : "";
+  document.getElementById("ola").textContent = `Olá, ${nome || "HS3DLab"} 👋`;
+  const d = new Date();
+  document.getElementById("subtitulo").textContent =
+    "Resumo de produção — " + d.toLocaleDateString("pt-BR", { day:"2-digit", month:"long" });
+})();
+
+async function carregar(){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  // últimos 7 dias por data de importação
+  const hoje = hojeISO();
+  const inicio7 = new Date(); inicio7.setDate(inicio7.getDate() - 6); inicio7.setHours(0,0,0,0);
+  const linhas = [];
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("produto,variacao,quantidade,origem,criado_em")
+      .gte("criado_em", inicio7.toISOString())
+      .order("id", { ascending: true })
+      .range(from, from + tam - 1);
+    if(error){ setStatus("Erro: " + error.message); console.error(error); return; }
+    linhas.push(...data);
+    if(data.length < tam) break;
+  }
+  // gcodes (produto -> {T,N})
+  const { data: gc } = await db.from("gcode_arquivos")
+    .select("produto,tempo_segundos,pecas").not("produto","is",null);
+  const gmap = {};
+  for(const g of (gc || [])) if(!gmap[g.produto]) gmap[g.produto] = { T:g.tempo_segundos, N:g.pecas };
+
+  const dia = r => toISO(new Date(r.criado_em));
+  const hojeLinhas = linhas.filter(r => dia(r) === hoje);
+  const ontemISO = (() => { const d = new Date(); d.setDate(d.getDate()-1); return toISO(d); })();
+  const ontemLinhas = linhas.filter(r => dia(r) === ontemISO);
+
+  renderCards(hojeLinhas, ontemLinhas);
+  renderChart(linhas);
+  renderProducao(hojeLinhas, gmap);
+  renderTop(hojeLinhas, gmap);
+  setStatus(`📅 hoje: ${hojeLinhas.reduce((s,r)=>s+(r.quantidade||0),0)} itens`);
+}
+
+function somaPorOrigem(linhas){
+  const o = { SHOPEE:0, RAPIDA:0, TIKTOK:0, OUTROS:0, TOTAL:0 };
+  for(const r of linhas){ const q = r.quantidade||0; o[r.origem in o ? r.origem : "OUTROS"] += q; o.TOTAL += q; }
+  return o;
+}
+function delta(hoje, ontem){
+  if(!ontem) return hoje > 0 ? "▲ novo" : "—";
+  const p = Math.round((hoje - ontem) / ontem * 100);
+  return (p >= 0 ? "▲ +" : "▼ ") + p + "% vs ontem";
+}
+
+function renderCards(hojeLinhas, ontemLinhas){
+  const h = somaPorOrigem(hojeLinhas), o = somaPorOrigem(ontemLinhas);
+  const card = (cls, chip, tag, val, sub) => `
+    <div class="balcard ${cls}"><div class="chip">${chip}</div>
+      <div class="tag">${tag}</div><div class="big">${val}</div><div class="sub">${sub}</div></div>`;
+  document.getElementById("cards").innerHTML =
+    card("c-total","📦","Itens hoje", h.TOTAL, `${hojeLinhas.length} linha(s)`) +
+    card("c-shopee","🛍️","Shopee", h.SHOPEE, delta(h.SHOPEE,o.SHOPEE)) +
+    card("c-rapida","🚚","Entrega Rápida", h.RAPIDA, delta(h.RAPIDA,o.RAPIDA)) +
+    card("c-tiktok","🎵","TikTok", h.TIKTOK, delta(h.TIKTOK,o.TIKTOK));
+}
+
+let chartData = null;   // { dias, vals } guardado para redesenhar no resize
+function renderChart(linhas){
+  const dias = [];
+  for(let i = 6; i >= 0; i--){ const d = new Date(); d.setDate(d.getDate()-i); dias.push(toISO(d)); }
+  const mapa = {}; dias.forEach(d => mapa[d] = 0);
+  for(const r of linhas){ const d = toISO(new Date(r.criado_em)); if(d in mapa) mapa[d] += (r.quantidade||0); }
+  chartData = { dias, vals: dias.map(d => mapa[d]) };
+  drawChart();
+}
+
+// Desenha medindo a largura REAL do SVG (viewBox = pixels) -> sem distorção em qualquer monitor
+function drawChart(){
+  if(!chartData) return;
+  const svg = document.getElementById("chart");
+  const W = Math.max(320, Math.round(svg.clientWidth || svg.parentElement.clientWidth || 800));
+  const H = 240, padX = 38, padT = 18, padB = 34;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const { dias, vals } = chartData;
+  const max = Math.max(1, ...vals);
+  const x = i => dias.length === 1 ? W/2 : padX + i * (W - 2*padX) / (dias.length - 1);
+  const y = v => padT + (1 - v/max) * (H - padT - padB);
+  const pts = vals.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const base = (H - padB).toFixed(1);
+  const area = `${padX},${base} ${pts.join(" ")} ${(W - padX).toFixed(1)},${base}`;
+  svg.innerHTML = `
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6d5efc" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#6d5efc" stop-opacity="0"/></linearGradient></defs>
+    <polyline fill="url(#g)" stroke="none" points="${area}"/>
+    <polyline fill="none" stroke="#6d5efc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${pts.join(" ")}"/>
+    ${vals.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="#fff" stroke="#6d5efc" stroke-width="2.5"/>`).join("")}
+    ${dias.map((d,i)=>{ const anchor = i===0 ? "start" : i===dias.length-1 ? "end" : "middle";
+      return `<text x="${x(i).toFixed(1)}" y="${H-10}" font-size="12" fill="#7c8398" text-anchor="${anchor}">${fmtDiaCurto(d)}</text>`; }).join("")}`;
+}
+
+let _resizeT;
+window.addEventListener("resize", () => { clearTimeout(_resizeT); _resizeT = setTimeout(drawChart, 150); });
+
+function renderProducao(hojeLinhas, gmap){
+  // agrega por produto+variação -> jobs (ceil(qty/N) x T)
+  const agg = new Map();
+  for(const r of hojeLinhas){
+    const key = r.produto + " ||| " + (r.variacao ?? "");
+    agg.set(key, { produto:r.produto, qty:(agg.get(key)?.qty || 0) + (r.quantidade||0) });
+  }
+  const jobs = [];
+  for(const { produto, qty } of agg.values()){
+    const g = gmap[produto]; if(!g || g.T == null) continue;
+    const N = (g.N && g.N >= 1) ? g.N : 1;
+    const placas = Math.ceil(qty / N);
+    for(let i = 0; i < placas; i++) jobs.push(g.T);
+  }
+  const cont = document.getElementById("prod");
+  if(!jobs.length){ cont.innerHTML = `<div class="vazio">Sem produção com gcode hoje.</div>`;
+    document.getElementById("prodHint").textContent = "Carga por impressora"; return; }
+  // LPT
+  jobs.sort((a,b) => b - a);
+  const maq = Array.from({length:K}, () => 0);
+  for(const t of jobs){ let m = 0; for(let i=1;i<K;i++) if(maq[i] < maq[m]) m = i; maq[m] += t; }
+  const makespan = Math.max(...maq);
+  document.getElementById("prodHint").textContent =
+    `${jobs.length} placa(s) · ${K} impressora(s) · makespan ${formatTempo(makespan)}`;
+  const cores = ["#6d5efc,#9b8cff","#ff5a3c,#ff8566","#10b3a3,#3ad6c2","#2f7bff,#6aa6ff","#f59e0b,#fbbf24"];
+  cont.innerHTML = maq.map((carga,i) => {
+    const pct = makespan ? Math.round(carga/makespan*100) : 0;
+    return `<div class="limit"><div class="row"><span>Impressora ${i+1}</span><b>${formatTempo(carga)}</b></div>
+      <div class="bar"><i style="width:${pct}%;background:linear-gradient(90deg,${cores[i%cores.length]})"></i></div></div>`;
+  }).join("");
+}
+
+const ICONES = ["🔑","🏍️","🧩","⚙️","🔧","🎮","🛠️","📦"];
+function renderTop(hojeLinhas, gmap){
+  const porProd = new Map();
+  for(const r of hojeLinhas){
+    const cur = porProd.get(r.produto) || { produto:r.produto, itens:0, porOrigem:{}, vars:new Map() };
+    cur.itens += (r.quantidade||0);
+    cur.porOrigem[r.origem] = (cur.porOrigem[r.origem]||0) + (r.quantidade||0);
+    const v = r.variacao ?? "";
+    cur.vars.set(v, (cur.vars.get(v)||0) + (r.quantidade||0));
+    porProd.set(r.produto, cur);
+  }
+  const lista = [...porProd.values()].sort((a,b) => b.itens - a.itens).slice(0, 5);
+  const tbody = document.getElementById("top");
+  if(!lista.length){ tbody.innerHTML = `<tr><td colspan="5" class="vazio">Nenhuma venda hoje.</td></tr>`; return; }
+  tbody.innerHTML = lista.map((p,i) => {
+    const origem = Object.entries(p.porOrigem).sort((a,b)=>b[1]-a[1])[0]?.[0] || "OUTROS";
+    const g = gmap[p.produto]; const N = (g && g.N >= 1) ? g.N : 1;
+    let placas = 0; for(const q of p.vars.values()) placas += Math.ceil(q / N);
+    return `<tr>
+      <td><span class="dot">${ICONES[i % ICONES.length]}</span></td>
+      <td><strong>${esc(p.produto)}</strong></td>
+      <td><span class="pill p-${origem}">${LABELS[origem] || origem}</span></td>
+      <td>${p.itens}</td>
+      <td>${g ? placas : "—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+carregar();
+</script>
+</body>
+</html>

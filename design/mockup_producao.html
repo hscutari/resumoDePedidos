@@ -1,0 +1,195 @@
+<title>Produção — mockup</title>
+<style>
+  :root{
+    --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --ink:#1a1d29; --muted:#7c8398;
+    --line:#eceef4; --accent:#6d5efc; --accent2:#9b8cff; --shadow:0 10px 30px rgba(31,38,72,.08);
+    --warn-bg:#fffbeb; --warn-line:#fde68a; --warn-ink:#92400e;
+  }
+  *{box-sizing:border-box}
+  .wrap{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+        background:var(--bg);color:var(--ink);min-height:100vh;display:flex}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow)}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:1500px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}.topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .dbstatus{font-size:18px}
+
+  .panel{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+  .panel .ph{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;border-bottom:1px solid var(--line)}
+  .panel .ph h2{margin:0;font-size:15px}.panel .ph .meta{color:var(--muted);font-size:12px}
+  .panel .pb{padding:18px 20px}
+
+  /* controles */
+  .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .field input{padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fafbff;color:var(--ink)}
+  .go{border:0;border-radius:11px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;
+      background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(109,94,252,.3)}
+
+  /* cards resumo */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px}
+  .stat{background:var(--card);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .stat.accent{background:linear-gradient(135deg,#6d5efc,#9b8cff);color:#fff}.stat.accent .l{color:#eee}
+
+  .sec{font-size:16px;margin:4px 0 14px}
+
+  /* grade de impressoras */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .printer{background:var(--card);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+  .printer .ph{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .printer .ph .name{font-weight:700;font-size:14px}
+  .printer .ph .tot{font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+  .printer .bar{height:6px;background:#eef0f7}
+  .printer .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+  /* resumo de itens (por produto) */
+  .psum{padding:11px 16px;background:#f3f1ff;border-bottom:1px solid var(--line)}
+  .psum-h{font-size:13px;font-weight:700;color:#4b3fd6;margin:0 0 6px}
+  .psum-r{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;color:#3a4055}
+  .psum-r .psum-q{white-space:nowrap;color:#5b54e0;font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* fila */
+  .job{display:flex;justify-content:space-between;gap:10px;padding:9px 16px;border-top:1px solid var(--line);font-size:13px;transition:background .08s}
+  .job:hover,.job.hl{background:#dcfce7}
+  .job .jp{font-weight:600}
+  .job .jv{color:var(--muted);font-size:12px}
+  .job .jt{white-space:nowrap;color:#374151;font-variant-numeric:tabular-nums}
+  .idle{padding:8px 16px;font-size:12px;color:var(--muted);background:#fafbff;border-top:1px solid var(--line)}
+
+  /* avisos */
+  .warn{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:16px;padding:16px 18px;margin-top:18px}
+  .warn h3{margin:0 0 8px;font-size:14px;color:var(--warn-ink)}
+  .warn ul{margin:0;padding-left:20px;font-size:13px;color:#78350f}
+  .warn p{margin:8px 0 0;font-size:12px;color:#78350f}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a>🏠<span class="lbl">Início</span></a>
+      <a>📋<span class="lbl">Resumo</span></a>
+      <a>📦<span class="lbl">Produtos</span></a>
+      <a class="active">🖨️<span class="lbl">Produção</span></a>
+      <a>📈<span class="lbl">Vendas</span></a>
+      <a>👤<span class="lbl">Usuários</span></a>
+    </nav>
+    <div class="avatar">HC</div>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div><h1>🖨️ Distribuição nas impressoras</h1><p>Planejamento de produção do dia — divide as impressões entre as máquinas para terminar o quanto antes</p></div>
+      <span class="dbstatus" title="Banco conectado (Supabase)">🟢</span>
+    </div>
+
+    <!-- CONTROLES -->
+    <div class="panel">
+      <div class="ph"><h2>Parâmetros</h2><span class="meta">escolha o dia e o nº de impressoras</span></div>
+      <div class="pb">
+        <div class="controls">
+          <div class="field"><label>Dia</label><input value="23/06/2026" style="width:160px"></div>
+          <div class="field"><label>Nº de impressoras</label><input value="3" style="width:120px"></div>
+          <button class="go">Distribuir</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUMO -->
+    <div class="cards">
+      <div class="stat accent"><div class="v">11h 53m</div><div class="l">⏱ Termina em (makespan)</div></div>
+      <div class="stat"><div class="v">86</div><div class="l">📦 Itens a imprimir</div></div>
+      <div class="stat"><div class="v">18</div><div class="l">🧱 Placas (jobs)</div></div>
+      <div class="stat"><div class="v">3</div><div class="l">🖨️ Impressoras</div></div>
+      <div class="stat"><div class="v">33h 40m</div><div class="l">Σ Tempo de impressão</div></div>
+    </div>
+
+    <h2 class="sec">Filas por impressora</h2>
+    <div class="grid">
+
+      <!-- Impressora 1 -->
+      <div class="printer">
+        <div class="ph"><span class="name">🖨️ Impressora 1</span><span class="tot">11h 53m</span></div>
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="psum">
+          <div class="psum-h">📦 32 itens a imprimir</div>
+          <div class="psum-r"><span>GRIP_BASE_PRETO · Preto</span><span class="psum-q">24 un · 3 placa(s)</span></div>
+          <div class="psum-r"><span>CHAVEIRO_HONDA · Preto</span><span class="psum-q">8 un · 2 placa(s)</span></div>
+        </div>
+        <div class="job hl"><div><span class="jp">GRIP_BASE_PRETO</span><span class="jv"> · Preto · placa 1/3 · 8 pç</span></div><div class="jt">3h 58m</div></div>
+        <div class="job hl"><div><span class="jp">GRIP_BASE_PRETO</span><span class="jv"> · Preto · placa 2/3 · 8 pç</span></div><div class="jt">3h 58m</div></div>
+        <div class="job"><div><span class="jp">CHAVEIRO_HONDA</span><span class="jv"> · Preto · placa 1/2 · 4 pç</span></div><div class="jt">1h 20m</div></div>
+        <div class="job"><div><span class="jp">CHAVEIRO_HONDA</span><span class="jv"> · Preto · placa 2/2 · 4 pç</span></div><div class="jt">1h 20m</div></div>
+        <div class="idle">Ocioso ao final: —</div>
+      </div>
+
+      <!-- Impressora 2 -->
+      <div class="printer">
+        <div class="ph"><span class="name">🖨️ Impressora 2</span><span class="tot">11h 18m</span></div>
+        <div class="bar"><i style="width:95%"></i></div>
+        <div class="psum">
+          <div class="psum-h">📦 30 itens a imprimir</div>
+          <div class="psum-r"><span>ENGRENAGEM_X · Azul</span><span class="psum-q">18 un · 3 placa(s)</span></div>
+          <div class="psum-r"><span>SUPORTE_FONE · Branco</span><span class="psum-q">12 un · 2 placa(s)</span></div>
+        </div>
+        <div class="job"><div><span class="jp">ENGRENAGEM_X</span><span class="jv"> · Azul · placa 1/3 · 6 pç</span></div><div class="jt">2h 40m</div></div>
+        <div class="job"><div><span class="jp">ENGRENAGEM_X</span><span class="jv"> · Azul · placa 2/3 · 6 pç</span></div><div class="jt">2h 40m</div></div>
+        <div class="job"><div><span class="jp">ENGRENAGEM_X</span><span class="jv"> · Azul · placa 3/3 · 6 pç</span></div><div class="jt">2h 40m</div></div>
+        <div class="job"><div><span class="jp">SUPORTE_FONE</span><span class="jv"> · Branco · placa 1/2 · 6 pç</span></div><div class="jt">1h 39m</div></div>
+        <div class="job"><div><span class="jp">SUPORTE_FONE</span><span class="jv"> · Branco · placa 2/2 · 6 pç</span></div><div class="jt">1h 39m</div></div>
+        <div class="idle">Ocioso ao final: 35m</div>
+      </div>
+
+      <!-- Impressora 3 -->
+      <div class="printer">
+        <div class="ph"><span class="name">🖨️ Impressora 3</span><span class="tot">10h 29m</span></div>
+        <div class="bar"><i style="width:88%"></i></div>
+        <div class="psum">
+          <div class="psum-h">📦 24 itens a imprimir</div>
+          <div class="psum-r"><span>GRIP_BASE_PRETO · Vermelho</span><span class="psum-q">16 un · 2 placa(s)</span></div>
+          <div class="psum-r"><span>CASE_AIRPODS · Branco</span><span class="psum-q">8 un · 2 placa(s)</span></div>
+        </div>
+        <div class="job"><div><span class="jp">GRIP_BASE_PRETO</span><span class="jv"> · Vermelho · placa 1/2 · 8 pç</span></div><div class="jt">3h 58m</div></div>
+        <div class="job"><div><span class="jp">GRIP_BASE_PRETO</span><span class="jv"> · Vermelho · placa 2/2 · 8 pç</span></div><div class="jt">3h 58m</div></div>
+        <div class="job"><div><span class="jp">CASE_AIRPODS</span><span class="jv"> · Branco · placa 1/2 · 4 pç</span></div><div class="jt">1h 16m</div></div>
+        <div class="job"><div><span class="jp">CASE_AIRPODS</span><span class="jv"> · Branco · placa 2/2 · 4 pç</span></div><div class="jt">1h 16m</div></div>
+        <div class="idle">Ocioso ao final: 1h 24m</div>
+      </div>
+
+    </div>
+
+    <!-- AVISOS -->
+    <div class="warn">
+      <h3>ℹ️ Peças por placa desconhecidas (assumido 1 peça/placa)</h3>
+      <ul><li>CASE_AIRPODS</li></ul>
+    </div>
+    <div class="warn">
+      <h3>⚠️ Sem gcode/tempo — não distribuídos (2)</h3>
+      <ul>
+        <li>PORTA_CHAVE · Preto — 6 un.</li>
+        <li>1734433951567217727 — 3 un.</li>
+      </ul>
+      <p>Vincule um gcode a esses produtos na tela de Produtos para incluí-los no cálculo.</p>
+    </div>
+  </div></section>
+</div>

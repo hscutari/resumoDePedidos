@@ -1,0 +1,194 @@
+<title>Vendas por dia — mockup</title>
+<style>
+  :root{
+    --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --ink:#1a1d29; --muted:#7c8398;
+    --line:#eceef4; --accent:#6d5efc; --accent2:#9b8cff; --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  .wrap{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+        background:var(--bg);color:var(--ink);min-height:100vh;display:flex}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow)}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:1500px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}.topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .dbstatus{font-size:18px}
+
+  .panel{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+  .panel .ph{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;border-bottom:1px solid var(--line)}
+  .panel .ph h2{margin:0;font-size:15px}.panel .ph .meta{color:var(--muted);font-size:12px}
+  .panel .pb{padding:18px 20px}
+
+  /* controles */
+  .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field select{padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fafbff;color:var(--ink)}
+  .toggle{border:1px solid var(--line);background:#fafbff;border-radius:11px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;color:#3a4055}
+  .toggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* cards resumo */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+  .stat{background:var(--card);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .stat.accent{background:linear-gradient(135deg,#6d5efc,#9b8cff);color:#fff}.stat.accent .l{color:#eee}
+
+  /* lista de produtos */
+  .prodactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .prodactions input{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:#fafbff}
+  .mini{border:1px solid var(--line);background:#fafbff;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#3a4055}
+  .prodlista{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 14px;max-height:170px;overflow:auto}
+  .prodlista label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 5px;border-radius:7px}
+  .prodlista label:hover{background:#f3f4fb}
+  .prodlista .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+  .prodlista .pn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+  .prodlista .pq{color:var(--muted);font-size:11px}
+  .prodlista input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+
+  /* legenda do gráfico */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:14px}
+  .legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:#3a4055}
+  .legend .ln{width:18px;height:3px;border-radius:2px;display:inline-block}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a>🏠<span class="lbl">Início</span></a>
+      <a>📋<span class="lbl">Resumo</span></a>
+      <a>📦<span class="lbl">Produtos</span></a>
+      <a>🖨️<span class="lbl">Produção</span></a>
+      <a class="active">📈<span class="lbl">Vendas</span></a>
+      <a>👤<span class="lbl">Usuários</span></a>
+    </nav>
+    <div class="avatar">HC</div>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div><h1>📈 Vendas por dia</h1><p>Itens vendidos por produto, por dia — usando o <strong>deadline</strong> como dia da venda</p></div>
+      <span class="dbstatus" title="Banco conectado (Supabase)">🟢</span>
+    </div>
+
+    <!-- CONTROLES -->
+    <div class="panel">
+      <div class="ph"><h2>Filtros</h2><span class="meta">312 vendas com deadline · 14 produtos</span></div>
+      <div class="pb">
+        <div class="controls">
+          <div class="field"><label>Período (deadline)</label><input value="01/06 — 23/06" style="min-width:200px"></div>
+          <div class="field"><label>Dias de projeção</label><input type="number" value="7" style="width:90px"></div>
+          <button class="toggle on">📈 Tendência: ligada</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div class="panel">
+      <div class="ph"><h2>Produtos no gráfico</h2>
+        <div class="prodactions">
+          <input type="search" placeholder="🔍 Filtrar produto…">
+          <button class="mini">Marcar todos</button>
+          <button class="mini">Limpar</button>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="prodlista">
+          <label><input type="checkbox" checked><span class="dot" style="background:hsl(0 65% 55%)"></span><span class="pn">CHAVEIRO_HONDA</span><span class="pq">142</span></label>
+          <label><input type="checkbox" checked><span class="dot" style="background:hsl(137 65% 55%)"></span><span class="pn">GRIP_BASE</span><span class="pq">98</span></label>
+          <label><input type="checkbox" checked><span class="dot" style="background:hsl(275 65% 55%)"></span><span class="pn">SUPORTE_FONE</span><span class="pq">61</span></label>
+          <label><input type="checkbox" checked><span class="dot" style="background:hsl(52 65% 55%)"></span><span class="pn">ENGRENAGEM_X</span><span class="pq">47</span></label>
+          <label><input type="checkbox"><span class="dot" style="background:hsl(190 65% 55%)"></span><span class="pn">CASE_AIRPODS</span><span class="pq">33</span></label>
+          <label><input type="checkbox"><span class="dot" style="background:hsl(327 65% 55%)"></span><span class="pn">PORTA_CHAVE</span><span class="pq">21</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUMO -->
+    <div class="cards">
+      <div class="stat accent"><div class="v">348</div><div class="l">📦 Itens (selecionados)</div></div>
+      <div class="stat"><div class="v">23</div><div class="l">📅 Dias com dados</div></div>
+      <div class="stat"><div class="v">4/14</div><div class="l">🧩 Produtos no gráfico</div></div>
+    </div>
+
+    <!-- GRÁFICO -->
+    <div class="panel">
+      <div class="ph"><h2>Itens vendidos por dia</h2><span class="meta">tracejado = projeção (+7 dias)</span></div>
+      <div class="pb">
+        <svg viewBox="0 0 820 360" width="100%" style="max-width:100%">
+          <!-- grid -->
+          <g stroke="#eceef4" stroke-width="1">
+            <line x1="50" y1="20"  x2="800" y2="20"/>
+            <line x1="50" y1="80"  x2="800" y2="80"/>
+            <line x1="50" y1="140" x2="800" y2="140"/>
+            <line x1="50" y1="200" x2="800" y2="200"/>
+            <line x1="50" y1="260" x2="800" y2="260"/>
+            <line x1="50" y1="300" x2="800" y2="300"/>
+          </g>
+          <!-- eixo y labels -->
+          <g fill="#7c8398" font-size="11" text-anchor="end">
+            <text x="42" y="24">50</text><text x="42" y="84">40</text>
+            <text x="42" y="144">30</text><text x="42" y="204">20</text>
+            <text x="42" y="264">10</text><text x="42" y="304">0</text>
+          </g>
+          <!-- divisor histórico/projeção -->
+          <line x1="560" y1="20" x2="560" y2="300" stroke="#cbd1e0" stroke-width="1" stroke-dasharray="3 4"/>
+          <text x="565" y="34" fill="#9aa1b4" font-size="10">projeção →</text>
+
+          <!-- CHAVEIRO_HONDA (vermelho) -->
+          <polyline fill="none" stroke="hsl(0 65% 55%)" stroke-width="2.5"
+            points="50,200 135,170 220,150 305,120 390,140 475,90 560,70"/>
+          <polyline fill="none" stroke="hsl(0 65% 55%)" stroke-width="2" stroke-dasharray="6 4"
+            points="560,70 640,58 720,46 800,34"/>
+          <!-- GRIP_BASE (verde) -->
+          <polyline fill="none" stroke="hsl(137 65% 55%)" stroke-width="2.5"
+            points="50,240 135,230 220,210 305,215 390,190 475,180 560,160"/>
+          <polyline fill="none" stroke="hsl(137 65% 55%)" stroke-width="2" stroke-dasharray="6 4"
+            points="560,160 640,150 720,140 800,131"/>
+          <!-- SUPORTE_FONE (roxo) -->
+          <polyline fill="none" stroke="hsl(275 65% 55%)" stroke-width="2.5"
+            points="50,275 135,265 220,270 305,250 390,255 475,240 560,235"/>
+          <polyline fill="none" stroke="hsl(275 65% 55%)" stroke-width="2" stroke-dasharray="6 4"
+            points="560,235 640,229 720,224 800,218"/>
+          <!-- ENGRENAGEM_X (amarelo) -->
+          <polyline fill="none" stroke="hsl(52 65% 55%)" stroke-width="2.5"
+            points="50,285 135,280 220,260 305,272 390,258 475,250 560,245"/>
+          <polyline fill="none" stroke="hsl(52 65% 55%)" stroke-width="2" stroke-dasharray="6 4"
+            points="560,245 640,242 720,239 800,236"/>
+
+          <!-- eixo x labels -->
+          <g fill="#7c8398" font-size="10" text-anchor="middle">
+            <text x="50" y="320">01/06</text><text x="220" y="320">08/06</text>
+            <text x="390" y="320">15/06</text><text x="560" y="320">23/06</text>
+            <text x="720" y="320">30/06</text>
+          </g>
+          <text x="425" y="348" fill="#7c8398" font-size="11" text-anchor="middle">Dia (deadline)</text>
+        </svg>
+
+        <div class="legend">
+          <span><i class="ln" style="background:hsl(0 65% 55%)"></i>CHAVEIRO_HONDA</span>
+          <span><i class="ln" style="background:hsl(137 65% 55%)"></i>GRIP_BASE</span>
+          <span><i class="ln" style="background:hsl(275 65% 55%)"></i>SUPORTE_FONE</span>
+          <span><i class="ln" style="background:hsl(52 65% 55%)"></i>ENGRENAGEM_X</span>
+        </div>
+      </div>
+    </div>
+  </div></section>
+</div>

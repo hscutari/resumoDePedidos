@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendas por dia — Gráfico</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+<style>
+  :root{
+    --rapida:#6d5efc; --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --line:#eceef4;
+    --txt:#1a1d29; --muted:#7c8398; --accent:#6d5efc; --accent2:#9b8cff;
+    --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       margin:0;background:var(--bg);color:var(--txt)}
+
+  /* ===== Shell fintech: rail + content ===== */
+  .wrap{display:flex;min-height:100vh}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px;font-size:15px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a,.nav button{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover,.nav button:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:1500px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}
+  .topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .dbstatus{font-size:18px;cursor:default}
+
+  #status{font-size:13px;color:var(--muted);margin:0 0 16px}
+
+  /* painel base */
+  .panel{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:0 0 18px;overflow:hidden}
+  .panel .ph{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:15px 20px;border-bottom:1px solid var(--line)}
+  .panel .ph h2{margin:0;font-size:15px}
+  .panel .ph .meta{color:var(--muted);font-size:12px}
+  .panel .pb{padding:18px 20px}
+
+  .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field select{padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fafbff;color:var(--txt)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  #topn{width:90px}
+  #dataRange{min-width:230px;cursor:pointer}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--txt)}
+
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:0 0 18px}
+  .stat{background:var(--card);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .stat.accent{background:linear-gradient(135deg,#6d5efc,#9b8cff);color:#fff}
+  .stat.accent .l{color:#eee}
+
+  .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:18px 20px}
+  .chart-wrap{position:relative;height:60vh;min-height:380px}
+  .empty{color:var(--muted);font-style:italic;padding:30px;text-align:center}
+  .prodhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .prodactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .prodactions input{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:#fafbff}
+  .mini{border:1px solid var(--line);background:#fafbff;border-radius:9px;padding:8px 12px;
+        font-size:12px;font-weight:600;cursor:pointer;color:#3a4055}
+  .mini:hover{background:#eef0f7}
+  .mini.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .prodlista{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 14px;
+             max-height:200px;overflow:auto;padding:2px}
+  .prodlista label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;
+                   padding:4px 5px;border-radius:7px}
+  .prodlista label:hover{background:#f3f4fb}
+  .prodlista .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+  .prodlista .pn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prodlista .pq{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .prodlista input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a href="dashboard.html">🏠<span class="lbl">Início</span></a>
+      <a href="relatorio_pedidos.html">📋<span class="lbl">Resumo</span></a>
+      <a href="produtos.html">📦<span class="lbl">Produtos</span></a>
+      <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
+      <a class="active">📈<span class="lbl">Vendas</span></a>
+      <a href="usuarios.html">👤<span class="lbl">Usuários</span></a>
+    </nav>
+    <button onclick="Auth.logout()">⎋<span class="lbl">Sair</span></button>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div>
+        <h1>📈 Vendas por dia</h1>
+        <p>Itens vendidos por produto, por dia — usando a data de <strong>deadline</strong> como o dia da venda.</p>
+      </div>
+      <span class="dbstatus" id="dbstatus" title="Status do banco">⚪</span>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="panel">
+      <div class="ph"><h2>Filtros</h2></div>
+      <div class="pb">
+        <div class="controls">
+          <div class="field">
+            <label for="dataRange">Período (deadline)</label>
+            <input type="text" id="dataRange" placeholder="Selecione data(s)…" readonly>
+          </div>
+          <div class="field">
+            <label for="diasTend">Dias de projeção</label>
+            <input type="number" id="diasTend" min="1" max="60" step="1" value="7">
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button id="toggleTend" class="mini" style="padding:10px 14px">📉 Tendência: desligada</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">
+        <h2>Produtos no gráfico</h2>
+        <div class="prodactions">
+          <input type="search" id="buscaProd" placeholder="🔍 Filtrar produto…">
+          <button id="marcarTodos" class="mini">Marcar todos</button>
+          <button id="limparTodos" class="mini">Limpar</button>
+        </div>
+      </div>
+      <div class="pb"><div id="prodLista" class="prodlista"></div></div>
+    </div>
+
+    <div id="resumo" class="summary"></div>
+    <div class="card">
+      <div id="vazio" class="empty" style="display:none">Sem dados de deadline no período.</div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+  </div></section>
+</div>
+
+<script>
+// ===== Supabase (mesma config do app) =====
+const SUPABASE_URL = "https://upctjkyfazudvttqrysp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwY3Rqa3lmYXp1ZHZ0dHFyeXNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzMyMjQsImV4cCI6MjA5Njg0OTIyNH0.MhSONZDBMfbxOkTKzxip1jZ8Yy56TkYxHePtKtunCcw";
+const db = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const setStatus = s => document.getElementById("status").textContent = s;
+const fmtDia = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}`; };
+const corProduto = i => `hsl(${(i * 137.508) % 360} 65% 55%)`;
+
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const escAttr = s => esc(s).replace(/"/g, "&quot;");
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+let linhas = [];                 // { produto, qty, deadline }
+let chart = null;
+let produtosOrden = [];          // [ [produto, total], ... ] desc — ordem/cor estáveis
+const colorMap = {};             // produto -> cor estável
+const selecionados = new Set();  // produtos exibidos no gráfico
+let mostrarTendencia = false;    // linha tracejada de projeção
+
+// Regressão linear (mínimos quadrados) sobre y indexado por 0..n-1 -> { a, b }
+function regressao(ys){
+  const n = ys.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for(let i = 0; i < n; i++){ sx += i; sy += ys[i]; sxx += i*i; sxy += i*ys[i]; }
+  const den = n*sxx - sx*sx;
+  if(den === 0) return { a: 0, b: sy/n };
+  const a = (n*sxy - sx*sy)/den;
+  return { a, b: (sy - a*sx)/n };
+}
+const addDias = (iso, k) => { const [y,m,d] = iso.split("-").map(Number); return toISO(new Date(y, m-1, d+k)); };
+
+// Calendário de range
+const fp = flatpickr("#dataRange", {
+  mode: "range", dateFormat: "Y-m-d",
+  locale: (window.flatpickr && flatpickr.l10ns && flatpickr.l10ns.pt) ? "pt" : "default",
+  onClose: () => desenhar()
+});
+const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+async function carregarDados(){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  setStatus("Carregando vendas…");
+  const out = [];
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("produto,quantidade,deadline")
+      .not("deadline", "is", null)
+      .order("id", { ascending: true })
+      .range(from, from + tam - 1);
+    if(error){ setStatus("Erro: " + error.message); console.error(error); return; }
+    out.push(...data);
+    if(data.length < tam) break;
+  }
+  linhas = out.map(r => ({ produto: r.produto, qty: r.quantidade || 0, deadline: r.deadline }));
+
+  // totais globais -> ordem e cores estáveis; seleção default = top 8
+  const tot = new Map();
+  for(const l of linhas) tot.set(l.produto, (tot.get(l.produto) || 0) + l.qty);
+  produtosOrden = [...tot.entries()].sort((a, b) => b[1] - a[1]);
+  produtosOrden.forEach(([p], i) => colorMap[p] = corProduto(i));
+  selecionados.clear();
+  produtosOrden.slice(0, 8).forEach(([p]) => selecionados.add(p));
+
+  setStatus(`${linhas.length} venda(s) com deadline · ${produtosOrden.length} produto(s).`);
+}
+
+// Lista de produtos (checkboxes) — filtrável por busca
+function buildFiltro(){
+  const f = norm(document.getElementById("buscaProd").value.trim());
+  const lista = document.getElementById("prodLista");
+  const itens = produtosOrden.filter(([p]) => !f || norm(p).includes(f));
+  lista.innerHTML = itens.length ? itens.map(([p, total]) => `
+    <label>
+      <input type="checkbox" data-prod="${escAttr(p)}" ${selecionados.has(p) ? "checked" : ""}>
+      <span class="dot" style="background:${colorMap[p]}"></span>
+      <span class="pn" title="${escAttr(p)}">${esc(p)}</span>
+      <span class="pq">${total}</span>
+    </label>`).join("") : `<div class="empty" style="padding:10px">Nenhum produto.</div>`;
+}
+
+function desenhar(){
+  const vazio = document.getElementById("vazio");
+  if(!linhas.length){
+    if(chart){ chart.destroy(); chart = null; }
+    document.getElementById("resumo").innerHTML = "";
+    vazio.style.display = ""; vazio.textContent = "Nenhuma venda com deadline encontrada.";
+    return;
+  }
+
+  // range selecionado (se vazio, usa tudo)
+  const ds = fp.selectedDates;
+  const de = ds.length ? toISO(ds[0]) : null;
+  const ate = ds.length ? toISO(ds[ds.length - 1]) : null;
+  const noRange = l => (!de || l.deadline >= de) && (!ate || l.deadline <= ate);
+  const filtradas = linhas.filter(noRange);
+
+  // agrega: dia -> produto -> qty
+  const dias = new Set(), mapa = new Map();
+  for(const l of filtradas){
+    dias.add(l.deadline);
+    if(!mapa.has(l.deadline)) mapa.set(l.deadline, new Map());
+    const m = mapa.get(l.deadline);
+    m.set(l.produto, (m.get(l.produto) || 0) + l.qty);
+  }
+  const labelsHist = [...dias].sort();                               // dias com dados (ISO)
+  const qtd = (d, p) => (mapa.get(d) || new Map()).get(p) || 0;
+  // produtos a desenhar: selecionados que têm alguma venda no período
+  const prods = [...selecionados].filter(p => labelsHist.some(d => qtd(d, p)));
+
+  if(!labelsHist.length || !prods.length){
+    if(chart){ chart.destroy(); chart = null; }
+    document.getElementById("resumo").innerHTML = "";
+    vazio.style.display = "";
+    vazio.textContent = !labelsHist.length
+      ? "Sem dados de deadline no período."
+      : "Selecione ao menos um produto com vendas no período.";
+    setStatus("");
+    return;
+  }
+  vazio.style.display = "none";
+
+  // estende dias futuros para a projeção de tendência
+  const nHist = labelsHist.length;
+  const podeTend = mostrarTendencia && nHist >= 2;
+  const horizonte = Math.max(1, Math.min(60, parseInt(document.getElementById("diasTend").value, 10) || 7));
+  let labels = labelsHist.slice();
+  if(podeTend){
+    const ult = labelsHist[nHist - 1];
+    for(let k = 1; k <= horizonte; k++) labels.push(addDias(ult, k));
+  }
+
+  // séries reais (null nos dias futuros)
+  const datasets = prods.map(p => ({
+    label: p,
+    borderColor: colorMap[p], backgroundColor: colorMap[p],
+    data: labels.map((d, i) => i < nHist ? qtd(labelsHist[i], p) : null),
+    tension: .25, fill: false, borderWidth: 2, pointRadius: 3, spanGaps: false
+  }));
+
+  // linhas de tendência (regressão linear por produto), tracejadas
+  if(podeTend){
+    for(const p of prods){
+      const { a, b } = regressao(labelsHist.map(d => qtd(d, p)));
+      datasets.push({
+        label: p + " · tend.",
+        borderColor: colorMap[p], backgroundColor: colorMap[p],
+        borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false, spanGaps: true,
+        data: labels.map((_, i) => Math.max(0, a * i + b))
+      });
+    }
+  }
+
+  const totalSel = prods.reduce((s, p) => s + labelsHist.reduce((acc, d) => acc + qtd(d, p), 0), 0);
+  document.getElementById("resumo").innerHTML = `
+    <div class="stat"><div class="v">${totalSel}</div><div class="l">📦 Itens (selecionados)</div></div>
+    <div class="stat"><div class="v">${nHist}</div><div class="l">📅 Dias com dados</div></div>
+    <div class="stat"><div class="v">${prods.length}/${produtosOrden.length}</div><div class="l">🧩 Produtos no gráfico</div></div>`;
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: { labels: labels.map(fmtDia), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { title: { display: true, text: "Dia (deadline)" + (podeTend ? " — tracejado = projeção" : "") } },
+        y: { beginAtZero: true, title: { display: true, text: "Itens vendidos" }, ticks: { precision: 0 } }
+      },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 },
+          filter: item => !item.text.endsWith("· tend.") } }   // esconde as tendências da legenda
+      }
+    }
+  });
+  setStatus(`📈 ${totalSel} itens · ${nHist} dia(s) · ${prods.length} produto(s)` +
+            (de ? ` · ${fmtDia(de)}–${fmtDia(ate)}` : "") +
+            (podeTend ? ` · projeção +${horizonte}d` : ""));
+}
+
+// Liga/desliga a projeção de tendência
+const btnTend = document.getElementById("toggleTend");
+btnTend.addEventListener("click", () => {
+  mostrarTendencia = !mostrarTendencia;
+  btnTend.classList.toggle("active", mostrarTendencia);
+  btnTend.textContent = mostrarTendencia ? "📈 Tendência: ligada" : "📉 Tendência: desligada";
+  desenhar();
+});
+document.getElementById("diasTend").addEventListener("change", () => { if(mostrarTendencia) desenhar(); });
+
+// Selecionar/desmarcar produto
+document.getElementById("prodLista").addEventListener("change", e => {
+  const cb = e.target.closest("input[type=checkbox]");
+  if(!cb) return;
+  if(cb.checked) selecionados.add(cb.dataset.prod); else selecionados.delete(cb.dataset.prod);
+  desenhar();
+});
+document.getElementById("buscaProd").addEventListener("input", buildFiltro);
+document.getElementById("marcarTodos").addEventListener("click", () => {
+  produtosOrden.forEach(([p]) => selecionados.add(p)); buildFiltro(); desenhar();
+});
+document.getElementById("limparTodos").addEventListener("click", () => {
+  selecionados.clear(); buildFiltro(); desenhar();
+});
+
+// init
+(async function(){
+  const dbel = document.getElementById("dbstatus");
+  dbel.textContent = db ? "🟢" : "⚪";
+  dbel.title = db ? "Banco conectado (Supabase)" : "Banco não configurado";
+  await carregarDados();
+  if(linhas.length){
+    const datas = linhas.map(l => l.deadline).sort();
+    fp.setDate([datas[0], datas[datas.length - 1]], false);   // range default = tudo
+  }
+  buildFiltro();
+  desenhar();
+})();
+</script>
+</body>
+</html>
