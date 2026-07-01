@@ -146,7 +146,7 @@
   .content button:hover{background:#5b4ef0}
   .content .navlink.primary{background:var(--accent);color:#fff;border-radius:10px}
   .content .navlink.primary:hover{background:#5b4ef0}
-  .content button.imp{background:#eef0f7;color:#3a4055}
+  .content button.imp{background:#eef0f7;color:#3a4055;min-width:158px;text-align:center}
   .content button.imp:hover{background:#e2e6f2}
   .content .imp.has{background:#dcfce7;color:#166534}
   .content .imp.has:hover{background:#bbf7d0}
@@ -164,6 +164,54 @@
   .content .topbar .navlink.primary{background:var(--accent);color:#fff;border:0}
   .content .topbar .navlink.primary:hover{background:#5b4ef0}
 
+  /* botão "Valores" na tabela (secundário) */
+  .content button.cfgval{background:#eef0f7;color:#3a4055}
+  .content button.cfgval:hover{background:#e2e6f2}
+  .acao .cfgval{margin-right:8px}
+  /* cor do $ por estado dos valores dos sub-produtos */
+  .content button.cfgval.val-none{background:#fee2e2;color:#b91c1c}
+  .content button.cfgval.val-none:hover{background:#fecaca}
+  .content button.cfgval.val-partial{background:#fef9c3;color:#854d0e}
+  .content button.cfgval.val-partial:hover{background:#fef08a}
+  .content button.cfgval.val-ok{background:#dcfce7;color:#166534}
+  .content button.cfgval.val-ok:hover{background:#bbf7d0}
+  /* modal de valores dos sub-produtos */
+  .valgrid{display:flex;flex-direction:column;gap:8px}
+  .valrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+          border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .valrow .vname{font-weight:600;font-size:14px;word-break:break-word;flex:1;min-width:130px}
+  .valrow .vqty{color:var(--muted);font-weight:500;font-size:12px;margin-left:6px}
+  .valinput{display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted);font-size:13px}
+  .valinput input{width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;text-align:right;color:var(--txt)}
+  .valinput input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  .valinput input.saved{border-color:#16a34a;background:#f0fdf4}
+  .valempty{padding:18px;color:var(--muted);font-style:italic}
+  /* tabela de valores (colunas alinhadas) */
+  .valtable{width:100%;min-width:0;border-collapse:collapse;font-size:13px}
+  .valtable th:first-child,.valtable td.vn{width:100%}   /* nome absorve a folga; colunas de número ficam juntas */
+  .valtable th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding:6px 8px;text-align:left}
+  .valtable th.num{text-align:right}
+  .valtable td{padding:6px 8px;border-top:1px solid var(--line);vertical-align:middle}
+  .valtable td.vn{padding-right:20px}
+  .valtable td.vn{font-weight:600;word-break:break-word}
+  .valtable td.num{text-align:right;white-space:nowrap}
+  .valtable .vqty{color:var(--muted);font-weight:500;font-size:12px}
+  .valtable input{width:100px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;text-align:right;color:var(--txt)}
+  .valtable input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  .valtable input.saved{border-color:#16a34a;background:#f0fdf4}
+  .valtable .pv{font-variant-numeric:tabular-nums;font-weight:700}
+  .valtable .pv.pos{color:#166534}
+  .valtable .pv.neg{color:#b91c1c}
+  /* configuração em massa */
+  .valbulk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+           background:#f3f1ff;border:1px solid #e4e0ff;border-radius:10px;padding:10px 12px;margin:0 0 12px}
+  .valbulk .lbl{font-size:13px;color:#4b3fd6;font-weight:700}
+  .valbulk button{padding:8px 14px}
+  /* gasto em ADS (nível do produto) */
+  .valprod{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+           background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 12px;margin:0 0 14px}
+  .valprod .lbl{font-size:13px;color:#9a3412;font-weight:700}
+
   @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
 </style>
 </head>
@@ -178,6 +226,8 @@
       <a href="producao.html" title="Produção">🖨️<span class="lbl">Produção</span></a>
       <a href="vendas_grafico.html" title="Vendas">📈<span class="lbl">Vendas</span></a>
       <a href="usuarios.html" title="Usuários">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html" title="Configurações">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html" title="Fechamento">📒<span class="lbl">Fechamento</span></a>
     </nav>
     <button class="avatar" onclick="Auth.logout()" title="Sair">⎋</button>
   </aside>
@@ -240,6 +290,37 @@
         <div style="display:flex;gap:10px">
           <button class="btn-ghost" id="vincCancelar">Cancelar</button>
           <button id="vincSalvar" style="background:var(--rapida)">Salvar vínculos</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de valores dos sub-produtos -->
+  <div class="overlay" id="valOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>💲 Configurar valores <span id="valProdNome" style="color:var(--muted);font-weight:500;font-size:14px"></span></h2>
+        <button class="x" id="valFechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="valprod">
+          <span class="lbl">📣 Gastos em ADS (produto):</span>
+          <div class="valinput">R$ <input type="number" id="valAds" min="0" step="0.01" placeholder="0,00"></div>
+        </div>
+        <div class="vsec-label">Sub-produtos deste produto</div>
+        <div class="valbulk" id="valBulkBar" style="display:none">
+          <span class="lbl">Aplicar a todos:</span>
+          <div class="valinput">Venda R$ <input type="number" id="valBulkVenda" min="0" step="0.01" placeholder="0,00"></div>
+          <div class="valinput">Custo R$ <input type="number" id="valBulkCusto" min="0" step="0.01" placeholder="0,00"></div>
+          <button class="btn-ghost" id="valAplicarTodos" type="button">Aplicar</button>
+        </div>
+        <div id="valLista" class="valgrid"></div>
+      </div>
+      <div class="modal-foot">
+        <span class="hint" id="valHint"></span>
+        <div style="display:flex;gap:10px">
+          <button class="btn-ghost" id="valCancelar">Cancelar</button>
+          <button id="valSalvar" style="background:var(--accent)">Salvar valores</button>
         </div>
       </div>
     </div>
@@ -751,6 +832,36 @@ document.getElementById("bulkBody").addEventListener("click", async e => {
 
 let produtos = [];   // todos os produtos carregados do banco
 let gcodeMap = {};   // codigo -> { arquivo, tempo_segundos, pecas, linhas }
+let subValMap = {};  // produto -> { total, comValor } (sub-produtos com venda+custo cadastrados)
+
+// Estado dos valores dos sub-produtos -> cor do botão $
+function valInfo(cod){
+  const sv = subValMap[cod];
+  const total = sv ? sv.total : 0, com = sv ? sv.comValor : 0;
+  if(!total || com === 0)   return { cls:"val-none",    tit:"Nenhum sub-produto com valores cadastrados" };
+  if(com === total)         return { cls:"val-ok",      tit:"Todos os sub-produtos com valores cadastrados" };
+  return { cls:"val-partial", tit:`${com}/${total} sub-produtos com valores cadastrados` };
+}
+
+// Conta, por produto, quantos sub-produtos têm venda E custo cadastrados
+async function carregarSubValores(){
+  if(!db) return;
+  const map = {};
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("subprodutos")
+      .select("produto,valor_venda,custo_producao").order("id",{ascending:true}).range(from, from+tam-1);
+    if(error){ console.warn("subvalores:", error.message); return; }
+    for(const r of data){
+      const m = map[r.produto] || (map[r.produto] = { total:0, comValor:0 });
+      m.total++;
+      if(r.valor_venda != null && r.custo_producao != null) m.comValor++;
+    }
+    if(data.length < tam) break;
+  }
+  subValMap = map;
+  renderProdutos(document.getElementById("busca").value);
+}
 
 const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
 
@@ -801,7 +912,7 @@ function renderProdutos(filtro = ""){
       <td>${modelo}</td>
       <td>${tempo}</td>
       <td>${pecas}</td>
-      <td class="acao"><button class="imp${g ? " has" : ""}" data-cod="${esc(p.codigo)}">📥 ${g ? "Trocar" : "Importar"} gcode</button></td>
+      <td class="acao"><button class="cfgval ${valInfo(p.codigo).cls}" data-cod="${esc(p.codigo)}" title="${esc(valInfo(p.codigo).tit)}">$</button><button class="imp${g ? " has" : ""}" data-cod="${esc(p.codigo)}">📥 ${g ? "Trocar" : "Importar"} gcode</button></td>
     </tr>`; }).join("");
   document.getElementById("count").textContent =
     f ? `${lista.length} de ${produtos.length} produto(s).` : `${produtos.length} produto(s).`;
@@ -835,10 +946,187 @@ async function carregarProdutos(){
   setStatus("");
 }
 
+// ===== Modal: configurar valores dos sub-produtos =====
+const valOverlay = document.getElementById("valOverlay");
+let valProdAtual = null;
+let valSubs = [];   // subprodutos do produto atual
+
+function fecharValores(){ valOverlay.classList.remove("open"); }
+document.getElementById("valFechar").addEventListener("click", fecharValores);
+document.getElementById("valCancelar").addEventListener("click", fecharValores);
+valOverlay.addEventListener("click", e => { if(e.target === valOverlay) fecharValores(); });
+
+// Abre o pop-up de valores: lista os sub-produtos do produto e seus valores.
+async function abrirValores(cod){
+  if(!db) return;
+  valProdAtual = cod;
+  const prod = produtos.find(p => p.codigo === cod);
+  document.getElementById("valProdNome").textContent =
+    "— " + cod + (prod && prod.nome ? ` (${prod.nome})` : "");
+  document.getElementById("valHint").textContent = "Carregando…";
+  document.getElementById("valLista").innerHTML = "";
+  document.getElementById("valBulkVenda").value = "";
+  document.getElementById("valBulkCusto").value = "";
+  document.getElementById("valBulkBar").style.display = "none";
+  document.getElementById("valAds").value = "";
+  valOverlay.classList.add("open");
+  await carregarFinCfg();   // IR + faixas Shopee para a projeção
+  // gasto em ADS do produto (best-effort: não quebra se a coluna não existir)
+  db.from("produtos").select("gasto_ads").eq("codigo", cod).maybeSingle().then(({ data, error }) => {
+    if(!error && data && data.gasto_ads != null) document.getElementById("valAds").value = data.gasto_ads;
+    recalcProjecao();
+  });
+  const { data, error } = await db.from("subprodutos")
+    .select("id,nome,quantidade,valor_venda,custo_producao").eq("produto", cod).order("nome");
+  if(error){
+    document.getElementById("valBulkBar").style.display = "none";
+    document.getElementById("valLista").innerHTML =
+      `<div class="valempty">Não foi possível carregar os sub-produtos. Rode a migração <code>supabase_migration_subprodutos.sql</code> no Supabase.</div>`;
+    document.getElementById("valHint").textContent = "";
+    console.warn("subprodutos:", error.message);
+    return;
+  }
+  valSubs = data || [];
+  renderValores();
+}
+
+function renderValores(){
+  const lista = document.getElementById("valLista");
+  const bar = document.getElementById("valBulkBar");
+  if(!valSubs.length){
+    bar.style.display = "none";
+    lista.innerHTML = `<div class="valempty">Nenhum sub-produto cadastrado para este produto ainda. Eles são criados ao importar pedidos.</div>`;
+    document.getElementById("valHint").textContent = "0 sub-produto(s).";
+    return;
+  }
+  bar.style.display = "";   // habilita configuração em massa
+  lista.innerHTML = `<table class="valtable">
+    <thead><tr>
+      <th>Sub-produto</th><th class="num">Venda (R$)</th><th class="num">Custo (R$)</th><th class="num">Projeção</th>
+    </tr></thead>
+    <tbody>${valSubs.map(s => `
+      <tr>
+        <td class="vn">${esc(s.nome)} <span class="vqty">×${s.quantidade ?? 1}</span></td>
+        <td class="num"><input type="number" min="0" step="0.01" class="vp-venda" data-id="${s.id}"
+          value="${s.valor_venda != null ? s.valor_venda : ""}" placeholder="0,00"></td>
+        <td class="num"><input type="number" min="0" step="0.01" class="vp-custo" data-id="${s.id}"
+          value="${s.custo_producao != null ? s.custo_producao : ""}" placeholder="0,00"></td>
+        <td class="num"><b class="pv" data-id="${s.id}">—</b></td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+  document.getElementById("valHint").textContent = `${valSubs.length} sub-produto(s).`;
+  recalcProjecao();
+}
+
+// converte texto -> número (R$) ou null
+const moeda = v => { const t = String(v).trim().replace(",", "."); return t === "" ? null : Math.max(0, parseFloat(t) || 0); };
+const brl = v => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// IR (%) e faixas Shopee do usuário logado (para a projeção de lucro)
+let finCfg = { ir: 0, faixas: [] };
+async function carregarFinCfg(){
+  if(!db || !USUARIO) return;
+  const c = await db.from("config_usuario").select("ir_imposto_pct").eq("usuario", USUARIO).maybeSingle();
+  finCfg.ir = (!c.error && c.data && c.data.ir_imposto_pct != null) ? +c.data.ir_imposto_pct : 0;
+  const f = await db.from("shopee_faixas").select("preco_min,preco_max,comissao_pct,taxa_fixa")
+    .eq("usuario", USUARIO).order("preco_min");
+  finCfg.faixas = (!f.error && f.data) ? f.data : [];
+}
+function faixaPara(preco){
+  for(const f of finCfg.faixas){
+    const min = f.preco_min != null ? +f.preco_min : 0;
+    const max = f.preco_max != null ? +f.preco_max : Infinity;
+    if(preco >= min && preco <= max) return f;
+  }
+  return null;
+}
+// Projeção de lucro/prejuízo por sub-produto: venda − custo − taxa Shopee − IR − ADS
+function recalcProjecao(){
+  const adsUnit = moeda(document.getElementById("valAds").value) || 0;   // ADS por unidade (produto)
+  for(const sub of valSubs){
+    const pv  = document.querySelector(`#valLista .pv[data-id="${sub.id}"]`);
+    const vIn = document.querySelector(`#valLista input.vp-venda[data-id="${sub.id}"]`);
+    const cIn = document.querySelector(`#valLista input.vp-custo[data-id="${sub.id}"]`);
+    if(!pv || !vIn) continue;
+    const venda = moeda(vIn.value);
+    if(venda == null){ pv.textContent = "—"; pv.className = "pv"; continue; }
+    const custo = (cIn ? moeda(cIn.value) : null) || 0;
+    const fx = faixaPara(venda);
+    const shopee = fx ? venda * (+fx.comissao_pct || 0) / 100 + (+fx.taxa_fixa || 0) : 0;
+    const ir = venda * (finCfg.ir || 0) / 100;
+    const lucro = venda - custo - shopee - ir - adsUnit * (sub.quantidade || 1);
+    pv.textContent = brl(lucro);
+    pv.className = "pv " + (lucro >= 0 ? "pos" : "neg");
+  }
+}
+
+// Salva os valores alterados (1 update por sub-produto modificado)
+document.getElementById("valSalvar").addEventListener("click", async () => {
+  if(!db){ fecharValores(); return; }
+  document.getElementById("valHint").textContent = "Salvando…";
+  let ok = 0;
+  for(const sub of valSubs){
+    const vIn = document.querySelector(`#valLista input.vp-venda[data-id="${sub.id}"]`);
+    const cIn = document.querySelector(`#valLista input.vp-custo[data-id="${sub.id}"]`);
+    if(!vIn || !cIn) continue;
+    const venda = moeda(vIn.value), custo = moeda(cIn.value);
+    const atualV = sub.valor_venda != null ? parseFloat(sub.valor_venda) : null;
+    const atualC = sub.custo_producao != null ? parseFloat(sub.custo_producao) : null;
+    if(atualV === venda && atualC === custo) continue;          // nada mudou
+    const { error } = await db.from("subprodutos")
+      .update({ valor_venda: venda, custo_producao: custo }).eq("id", sub.id);
+    if(error){ console.error(error); continue; }
+    sub.valor_venda = venda; sub.custo_producao = custo;
+    ok++;
+  }
+  // gasto em ADS (nível do produto)
+  const ads = moeda(document.getElementById("valAds").value);
+  const { error: eAds } = await db.from("produtos").update({ gasto_ads: ads }).eq("codigo", valProdAtual);
+  if(eAds) console.warn("gasto_ads (rode supabase_migration_produtos_gasto_ads.sql):", eAds.message);
+  else { const pr = produtos.find(p => p.codigo === valProdAtual); if(pr) pr.gasto_ads = ads; }
+  fecharValores();
+  setStatus(`✅ ${valProdAtual}: ${ok} sub-produto(s) + ADS atualizado(s).`);
+  carregarSubValores();   // atualiza a cor do botão $
+});
+
+// Configuração em massa: aplica os valores digitados a TODOS os sub-produtos.
+// Campo em branco = não mexe naquela coluna (preencha só o que quer aplicar).
+function aplicarValorTodos(){
+  const v = document.getElementById("valBulkVenda").value.trim();
+  const c = document.getElementById("valBulkCusto").value.trim();
+  const venda = document.querySelectorAll("#valLista input.vp-venda");
+  const custo = document.querySelectorAll("#valLista input.vp-custo");
+  if(!venda.length) return;
+  if(v !== "") venda.forEach(i => { i.value = v; i.classList.remove("saved"); });
+  if(c !== "") custo.forEach(i => { i.value = c; i.classList.remove("saved"); });
+  const partes = [];
+  if(v !== "") partes.push(`venda R$ ${v}`);
+  if(c !== "") partes.push(`custo R$ ${c}`);
+  document.getElementById("valHint").textContent = partes.length
+    ? `${partes.join(" e ")} aplicado(s) a ${venda.length} sub-produto(s) — clique em Salvar.`
+    : "Preencha venda e/ou custo para aplicar a todos.";
+  recalcProjecao();
+}
+document.getElementById("valAplicarTodos").addEventListener("click", aplicarValorTodos);
+// Recalcula a projeção ao editar venda/custo (por sub-produto) ou o ADS (produto)
+document.getElementById("valLista").addEventListener("input", e => {
+  if(e.target.matches("input.vp-venda, input.vp-custo")) recalcProjecao();
+});
+document.getElementById("valAds").addEventListener("input", recalcProjecao);
+["valBulkVenda","valBulkCusto"].forEach(id =>
+  document.getElementById(id).addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); aplicarValorTodos(); } }));
+
+// Botão "💲 Valores" na tabela de produtos
+document.getElementById("tbody").addEventListener("click", e => {
+  const btn = e.target.closest("button.cfgval");
+  if(btn) abrirValores(btn.dataset.cod);
+});
+
 (async function init(){
   await detectarColunas();   // verifica se a coluna usuario existe antes de carregar
-  carregarProdutos();
+  await carregarProdutos();
   carregarBulk();
+  carregarSubValores();      // cores do botão $ conforme valores dos sub-produtos
 })();
 </script>
 </body>

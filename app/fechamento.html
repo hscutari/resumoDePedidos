@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fechamento do mês — HS3DLab</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/auth.js"></script>
+<style>
+  :root{
+    --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --line:#eceef4; --txt:#1a1d29;
+    --muted:#7c8398; --accent:#6d5efc; --accent2:#9b8cff; --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--txt)}
+  .wrap{display:flex;min-height:100vh}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px;font-size:15px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a,.nav button{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover,.nav button:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow);cursor:pointer;border:0;font-size:14px}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:820px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}.topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .topactions{display:flex;gap:10px;align-items:center}
+  .topactions input{padding:9px 12px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fff;color:var(--txt)}
+  .dbstatus{font-size:18px}
+  #status{font-size:13px;color:var(--muted);margin:0 0 16px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px}
+  .stat{background:var(--card);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .stat.accent{background:linear-gradient(135deg,#6d5efc,#9b8cff);color:#fff}.stat.accent .l{color:#eee}
+  .stat.pos{background:linear-gradient(135deg,#16a34a,#4ade80);color:#fff}.stat.pos .l{color:#eafff0}
+  .stat.neg{background:linear-gradient(135deg,#dc2626,#f87171);color:#fff}.stat.neg .l{color:#ffecec}
+
+  .dre{background:var(--card);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+  .dre-head,.dre-foot{display:flex;justify-content:space-between;align-items:center;padding:18px 22px}
+  .dre-head{background:#f3f1ff}
+  .dre-head .lbl{font-weight:700;color:#4b3fd6}
+  .dre-head .val{font-size:22px;font-weight:800;color:#4b3fd6;font-variant-numeric:tabular-nums}
+  .dre-body{padding:8px 22px}
+  .dre-sec{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:12px 0 4px}
+  .dre-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+  .dre-row:first-of-type{border-top:0}
+  .dre-row .sub{color:var(--muted);font-size:12px;font-weight:400}
+  .dre-row b{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dre-row .neg{color:#b91c1c}
+  .dre-row.total{border-top:2px solid #e4e7f0;font-weight:800}
+  .dre-foot{border-top:2px solid var(--line)}
+  .dre-foot .lbl{font-weight:800;font-size:16px}
+  .dre-foot .val{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .dre-foot.pos .val,.dre-foot.pos .lbl{color:#166534}
+  .dre-foot.neg .val,.dre-foot.neg .lbl{color:#b91c1c}
+  .finnote{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 12px;margin-top:14px}
+  .banner{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;color:#92400e;font-size:13px;margin:0 0 16px;display:none}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a href="dashboard.html" title="Início">🏠<span class="lbl">Início</span></a>
+      <a href="relatorio_pedidos.html" title="Resumo">📋<span class="lbl">Resumo</span></a>
+      <a href="produtos.html" title="Produtos">📦<span class="lbl">Produtos</span></a>
+      <a href="producao.html" title="Produção">🖨️<span class="lbl">Produção</span></a>
+      <a href="vendas_grafico.html" title="Vendas">📈<span class="lbl">Vendas</span></a>
+      <a href="usuarios.html" title="Usuários">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html" title="Configurações">⚙️<span class="lbl">Configurações</span></a>
+      <a class="active" title="Fechamento">📒<span class="lbl">Fechamento</span></a>
+    </nav>
+    <button class="avatar" id="sair" title="Sair">⎋</button>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div><h1>📒 Fechamento do mês</h1><p>Faturamento bruto − despesas = lucro líquido</p></div>
+      <div class="topactions">
+        <input type="month" id="mes" title="Mês">
+        <span class="dbstatus" id="dbstatus" title="Status do banco">⚪</span>
+      </div>
+    </div>
+
+    <div id="status"></div>
+    <div class="banner" id="banner"></div>
+    <div class="cards" id="resumo"></div>
+    <div id="dre"></div>
+  </div></section>
+</div>
+
+<script>
+const db = Auth.db;
+const USUARIO = (Auth.sessao() && Auth.sessao().login) || null;
+document.getElementById("sair").addEventListener("click", () => Auth.logout());
+const dbel = document.getElementById("dbstatus");
+dbel.textContent = db ? "🟢" : "⚪";
+dbel.title = db ? "Banco conectado (Supabase)" : "Banco não configurado";
+
+const setStatus = s => document.getElementById("status").textContent = s;
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const brl = v => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+// ---- carregadores (mesma lógica financeira das outras telas) ----
+async function carregarPrecosSub(){
+  const acc = {}; const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("subprodutos")
+      .select("produto,nome,quantidade,valor_venda,custo_producao").order("id",{ascending:true}).range(from, from+tam-1);
+    if(error){ console.warn("preços sub:", error.message); break; }
+    for(const r of data){
+      const Q = r.quantidade || 1, k = r.produto + " ||| " + r.nome;
+      const m = acc[k] || (acc[k] = { vS:0, vN:0, cS:0, cN:0 });
+      if(r.valor_venda    != null){ m.vS += (+r.valor_venda)/Q;    m.vN++; }
+      if(r.custo_producao != null){ m.cS += (+r.custo_producao)/Q; m.cN++; }
+    }
+    if(data.length < tam) break;
+  }
+  const out = {};
+  for(const k in acc){ const m = acc[k]; out[k] = { venda: m.vN ? m.vS/m.vN : null, custo: m.cN ? m.cS/m.cN : null }; }
+  return out;
+}
+async function carregarConfigFin(){
+  const cfg = { ir: 0, envio: 0, aluguel: 0, faixas: [] };
+  if(!USUARIO) return cfg;
+  const c = await db.from("config_usuario").select("ir_imposto_pct,custo_envio,aluguel").eq("usuario", USUARIO).maybeSingle();
+  if(!c.error && c.data){
+    if(c.data.ir_imposto_pct != null) cfg.ir = +c.data.ir_imposto_pct;
+    if(c.data.custo_envio != null) cfg.envio = +c.data.custo_envio;
+    if(c.data.aluguel != null) cfg.aluguel = +c.data.aluguel;
+  }
+  const f = await db.from("shopee_faixas").select("preco_min,preco_max,comissao_pct,taxa_fixa").eq("usuario", USUARIO).order("preco_min");
+  if(!f.error && f.data) cfg.faixas = f.data;
+  return cfg;
+}
+async function carregarAds(){
+  const map = {}; const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("produtos").select("codigo,gasto_ads").order("codigo").range(from, from+tam-1);
+    if(error){ console.warn("ads:", error.message); break; }
+    for(const r of data) if(r.gasto_ads != null) map[r.codigo] = +r.gasto_ads;
+    if(data.length < tam) break;
+  }
+  return map;
+}
+async function carregarSalarios(){
+  if(!USUARIO) return 0;
+  const { data, error } = await db.from("funcionarios").select("salario").eq("usuario", USUARIO);
+  if(error){ console.warn("funcionarios:", error.message); return 0; }
+  return (data || []).reduce((s, f) => s + (+f.salario || 0), 0);
+}
+function faixaPara(preco, faixas){
+  for(const f of faixas){
+    const min = f.preco_min != null ? +f.preco_min : 0;
+    const max = f.preco_max != null ? +f.preco_max : Infinity;
+    if(preco >= min && preco <= max) return f;
+  }
+  return null;
+}
+async function carregarVendasMes(de, ate){
+  const out = []; const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("pedido,produto,variacao,origem,quantidade,deadline")
+      .not("deadline","is",null).gte("deadline", de).lte("deadline", ate)
+      .order("id",{ascending:true}).range(from, from+tam-1);
+    if(error){ mostrarBanner(error); break; }
+    out.push(...data);
+    if(data.length < tam) break;
+  }
+  return out;
+}
+
+function mostrarBanner(error){
+  const b = document.getElementById("banner");
+  b.style.display = ""; b.innerHTML = `⚠️ ${esc(error.message)}`;
+  console.warn(error);
+}
+
+async function calcular(mesStr){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  const [y, m] = mesStr.split("-").map(Number);
+  const de = toISO(new Date(y, m-1, 1)), ate = toISO(new Date(y, m, 0));
+  setStatus(`Calculando fechamento de ${String(m).padStart(2,"0")}/${y}…`);
+  document.getElementById("banner").style.display = "none";
+  const [vendas, precos, cfg, adsMap, salarios] = await Promise.all([
+    carregarVendasMes(de, ate), carregarPrecosSub(), carregarConfigFin(), carregarAds(), carregarSalarios()
+  ]);
+
+  const irPct = (cfg.ir || 0) / 100, envioUnit = cfg.envio || 0;
+  const pedidosEnvio = new Set();
+  let fat = 0, custo = 0, shopee = 0, ir = 0, ads = 0, envio = 0, semPreco = 0;
+  for(const r of vendas){
+    const qty = r.quantidade || 0;
+    const p = precos[r.produto + " ||| " + (r.variacao ?? "")] || {};
+    const precoU = p.venda, custoU = p.custo;
+    if(precoU == null) semPreco++;
+    const linhaFat = (precoU || 0) * qty;
+    fat += linhaFat;
+    custo += (custoU || 0) * qty;
+    ads += (adsMap[r.produto] || 0) * qty;
+    if(r.origem === "SHOPEE" && precoU != null){
+      const fx = faixaPara(precoU, cfg.faixas);
+      if(fx) shopee += qty * (precoU * (+fx.comissao_pct || 0) / 100 + (+fx.taxa_fixa || 0));
+    }
+    ir += linhaFat * irPct;
+    if(envioUnit && (!r.pedido || !pedidosEnvio.has(r.pedido))){ envio += envioUnit; if(r.pedido) pedidosEnvio.add(r.pedido); }
+  }
+  const aluguel = cfg.aluguel || 0;
+  render({ mesStr, fat, custo, shopee, ir, ads, envio, aluguel, salarios, semPreco, irPctNum: cfg.ir });
+}
+
+function render(d){
+  const despesas = [
+    ["Custo de produção", d.custo, ""],
+    ["Taxa Shopee", d.shopee, ""],
+    [`IR`, d.ir, `${d.irPctNum || 0}% do faturamento`],
+    ["ADS", d.ads, ""],
+    ["Custo de envio", d.envio, "por pedido"],
+    ["Aluguel", d.aluguel, "custo fixo mensal"],
+    ["Salários", d.salarios, "custo fixo mensal"]
+  ];
+  const totalDesp = despesas.reduce((s, [,v]) => s + v, 0);
+  const lucro = d.fat - totalDesp;
+  const sinal = lucro >= 0 ? "pos" : "neg";
+
+  document.getElementById("resumo").innerHTML =
+    `<div class="stat accent"><div class="v">${brl(d.fat)}</div><div class="l">💰 Faturamento bruto</div></div>
+     <div class="stat"><div class="v">${brl(totalDesp)}</div><div class="l">📉 Total de despesas</div></div>
+     <div class="stat ${sinal}"><div class="v">${brl(lucro)}</div><div class="l">${lucro>=0?"✅":"⚠️"} Lucro líquido</div></div>`;
+
+  document.getElementById("dre").innerHTML = `
+    <div class="dre">
+      <div class="dre-head"><div class="lbl">Faturamento bruto</div><div class="val">${brl(d.fat)}</div></div>
+      <div class="dre-body">
+        <div class="dre-sec">Despesas</div>
+        ${despesas.map(([lbl, v, sub]) => `
+          <div class="dre-row"><span>${esc(lbl)}${sub ? ` <span class="sub">(${esc(sub)})</span>` : ""}</span><b class="neg">− ${brl(v)}</b></div>`).join("")}
+        <div class="dre-row total"><span>Total de despesas</span><b class="neg">− ${brl(totalDesp)}</b></div>
+      </div>
+      <div class="dre-foot ${sinal}"><div class="lbl">Lucro líquido</div><div class="val">${brl(lucro)}</div></div>
+    </div>
+    ${d.semPreco ? `<div class="finnote">⚠️ ${d.semPreco} venda(s) sem preço de venda cadastrado — contadas como R$ 0 no faturamento. Cadastre em Produtos → botão $.</div>` : ""}`;
+
+  setStatus("");
+}
+
+// init: mês corrente
+const mesEl = document.getElementById("mes");
+mesEl.value = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; })();
+mesEl.addEventListener("change", () => { if(mesEl.value) calcular(mesEl.value); });
+calcular(mesEl.value);
+</script>
+</body>
+</html>

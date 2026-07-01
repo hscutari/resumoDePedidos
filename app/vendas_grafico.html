@@ -35,6 +35,9 @@
   .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
               padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
   .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow);
+          cursor:pointer;border:0;font-size:14px}
 
   .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
   .inner{max-width:1500px;margin:0 auto}
@@ -88,6 +91,31 @@
   .prodlista .pq{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
   .prodlista input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
 
+  /* Relatório financeiro (faturamento/lucro por dia) */
+  .finwrap{overflow-x:auto}
+  table.fin{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+  table.fin th{background:#fafbff;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:10px 14px;text-align:right}
+  table.fin th:first-child{text-align:left}
+  table.fin td{padding:10px 14px;border-top:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+  table.fin td:first-child{text-align:left;font-weight:600}
+  table.fin tfoot td{border-top:2px solid #e4e7f0;font-weight:800;background:#fafbff}
+  table.fin .pos{color:#166534}
+  table.fin .neg{color:#b91c1c}
+  .finnote{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 12px;margin-top:10px}
+  .finempty{color:var(--muted);font-style:italic;padding:24px;text-align:center}
+  .finexp{border:0;background:#eef0f7;color:#3a4055;border-radius:6px;width:20px;height:20px;font-size:11px;cursor:pointer;margin-right:8px;padding:0;line-height:1}
+  .finexp:hover{background:#e2e6f2}
+  table.fin .meta{color:var(--muted);font-weight:400;font-size:11px}
+  tr.findet > td{padding:0 8px 10px;background:#f7f8fc}
+  table.findetail{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 14px rgba(31,38,72,.06)}
+  table.findetail th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.03em;padding:7px 10px;text-align:right;font-weight:700;background:#fafbff}
+  table.findetail th:first-child{text-align:left}
+  table.findetail td{padding:7px 10px;border-top:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+  table.findetail td:first-child{text-align:left}
+  table.findetail .meta{color:var(--muted);font-size:11px}
+  table.findetail .pos{color:#166534}
+  table.findetail .neg{color:#b91c1c}
+
   @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
 </style>
 </head>
@@ -102,8 +130,10 @@
       <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
       <a class="active">📈<span class="lbl">Vendas</span></a>
       <a href="usuarios.html">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html">📒<span class="lbl">Fechamento</span></a>
     </nav>
-    <button onclick="Auth.logout()">⎋<span class="lbl">Sair</span></button>
+    <button class="avatar" onclick="Auth.logout()" title="Sair">⎋</button>
   </aside>
 
   <section class="content"><div class="inner">
@@ -122,14 +152,21 @@
       <div class="pb">
         <div class="controls">
           <div class="field">
+            <label for="modoView">Visualização</label>
+            <select id="modoView">
+              <option value="grafico">📈 Itens vendidos</option>
+              <option value="fin">💰 Faturamento e lucro/dia</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="dataRange">Período (deadline)</label>
             <input type="text" id="dataRange" placeholder="Selecione data(s)…" readonly>
           </div>
-          <div class="field">
+          <div class="field" id="diasField">
             <label for="diasTend">Dias de projeção</label>
             <input type="number" id="diasTend" min="1" max="60" step="1" value="7">
           </div>
-          <div class="field">
+          <div class="field" id="tendField">
             <label>&nbsp;</label>
             <button id="toggleTend" class="mini" style="padding:10px 14px">📉 Tendência: desligada</button>
           </div>
@@ -137,7 +174,7 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panelProdutos">
       <div class="ph">
         <h2>Produtos no gráfico</h2>
         <div class="prodactions">
@@ -150,9 +187,17 @@
     </div>
 
     <div id="resumo" class="summary"></div>
-    <div class="card">
+    <div class="card" id="cardChart">
       <div id="vazio" class="empty" style="display:none">Sem dados de deadline no período.</div>
       <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+    <div class="panel" id="finPanel" style="display:none">
+      <div class="ph"><h2>💰 Faturamento e lucro por dia</h2><span class="meta" id="finMeta"></span></div>
+      <div class="pb">
+        <div id="finChartWrap" style="position:relative;height:320px;margin-bottom:18px"><canvas id="finChart"></canvas></div>
+        <div id="finReport"></div>
+      </div>
     </div>
   </div></section>
 </div>
@@ -174,6 +219,7 @@ const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 
 let linhas = [];                 // { produto, qty, deadline }
 let chart = null;
+let chartFin = null;             // gráfico do relatório financeiro
 let produtosOrden = [];          // [ [produto, total], ... ] desc — ordem/cor estáveis
 const colorMap = {};             // produto -> cor estável
 const selecionados = new Set();  // produtos exibidos no gráfico
@@ -194,7 +240,7 @@ const addDias = (iso, k) => { const [y,m,d] = iso.split("-").map(Number); return
 const fp = flatpickr("#dataRange", {
   mode: "range", dateFormat: "Y-m-d",
   locale: (window.flatpickr && flatpickr.l10ns && flatpickr.l10ns.pt) ? "pt" : "default",
-  onClose: () => desenhar()
+  onClose: () => { if(modoFin()) relatorioFinanceiro(); else desenhar(); }
 });
 const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
@@ -363,6 +409,237 @@ document.getElementById("marcarTodos").addEventListener("click", () => {
 });
 document.getElementById("limparTodos").addEventListener("click", () => {
   selecionados.clear(); buildFiltro(); desenhar();
+});
+
+// ===================== Faturamento e lucro líquido por dia =====================
+const USUARIO_FIN = (window.Auth && Auth.sessao()) ? Auth.sessao().login : null;
+const brl = v => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtData = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+const modoFin = () => document.getElementById("modoView").value === "fin";
+
+// Preço/custo POR UNIDADE de (produto|||nome); média do valor ÷ quantidade quando há vários multiplicadores.
+async function carregarPrecosSub(){
+  const acc = {};
+  if(!db) return {};
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("subprodutos")
+      .select("produto,nome,quantidade,valor_venda,custo_producao")
+      .order("id", { ascending: true }).range(from, from + tam - 1);
+    if(error){ console.warn("preços sub:", error.message); break; }
+    for(const r of data){
+      const Q = r.quantidade || 1, k = r.produto + " ||| " + r.nome;
+      const m = acc[k] || (acc[k] = { vS:0, vN:0, cS:0, cN:0 });
+      if(r.valor_venda    != null){ m.vS += (+r.valor_venda) / Q;    m.vN++; }
+      if(r.custo_producao != null){ m.cS += (+r.custo_producao) / Q; m.cN++; }
+    }
+    if(data.length < tam) break;
+  }
+  const out = {};
+  for(const k in acc){ const m = acc[k]; out[k] = { venda: m.vN ? m.vS/m.vN : null, custo: m.cN ? m.cS/m.cN : null }; }
+  return out;
+}
+
+// IR (%), custo de envio e faixas Shopee do usuário logado
+async function carregarConfigFin(){
+  const cfg = { ir: 0, envio: 0, faixas: [] };
+  if(!db || !USUARIO_FIN) return cfg;
+  const c = await db.from("config_usuario").select("ir_imposto_pct,custo_envio").eq("usuario", USUARIO_FIN).maybeSingle();
+  if(!c.error && c.data){
+    if(c.data.ir_imposto_pct != null) cfg.ir = +c.data.ir_imposto_pct;
+    if(c.data.custo_envio != null) cfg.envio = +c.data.custo_envio;
+  }
+  const f = await db.from("shopee_faixas").select("preco_min,preco_max,comissao_pct,taxa_fixa")
+    .eq("usuario", USUARIO_FIN).order("preco_min");
+  if(!f.error && f.data) cfg.faixas = f.data;
+  return cfg;
+}
+
+function faixaPara(preco, faixas){
+  for(const f of faixas){
+    const min = f.preco_min != null ? +f.preco_min : 0;
+    const max = f.preco_max != null ? +f.preco_max : Infinity;
+    if(preco >= min && preco <= max) return f;
+  }
+  return null;
+}
+
+// Gasto em ADS por produto (R$ por unidade vendida). Best-effort.
+async function carregarAds(){
+  const map = {};
+  if(!db) return map;
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("produtos").select("codigo,gasto_ads")
+      .order("codigo").range(from, from + tam - 1);
+    if(error){ console.warn("ads:", error.message); break; }
+    for(const r of data) if(r.gasto_ads != null) map[r.codigo] = +r.gasto_ads;
+    if(data.length < tam) break;
+  }
+  return map;
+}
+
+// Pedidos (com variação e origem) no range de deadline selecionado
+async function carregarVendasFin(de, ate){
+  const out = [];
+  if(!db) return out;
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    let q = db.from("pedidos").select("pedido,produto,variacao,origem,quantidade,deadline").not("deadline", "is", null);
+    if(de)  q = q.gte("deadline", de);
+    if(ate) q = q.lte("deadline", ate);
+    const { data, error } = await q.order("id", { ascending: true }).range(from, from + tam - 1);
+    if(error){ console.error("vendas fin:", error); break; }
+    out.push(...data);
+    if(data.length < tam) break;
+  }
+  return out;
+}
+
+async function relatorioFinanceiro(){
+  if(!db){ setStatus("⚪ Banco não configurado."); return; }
+  const ds = fp.selectedDates;
+  const de  = ds.length ? toISO(ds[0]) : null;
+  const ate = ds.length ? toISO(ds[ds.length - 1]) : null;
+  setStatus("Calculando faturamento/lucro…");
+  const [vendas, precos, cfg, adsMap] = await Promise.all([
+    carregarVendasFin(de, ate), carregarPrecosSub(), carregarConfigFin(), carregarAds()
+  ]);
+  const dias = new Map(); let semPreco = 0;
+  const irPct = (cfg.ir || 0) / 100;
+  const envioUnit = cfg.envio || 0;
+  const pedidosComEnvio = new Set();      // envio cobrado 1x por pedido (nº)
+  for(const r of vendas){
+    const qty = r.quantidade || 0;
+    const p = precos[r.produto + " ||| " + (r.variacao ?? "")] || {};
+    const precoU = p.venda, custoU = p.custo;
+    const noPrice = precoU == null;
+    if(noPrice) semPreco++;
+    const fat = (precoU || 0) * qty;
+    const custo = (custoU || 0) * qty;
+    const ads = (adsMap[r.produto] || 0) * qty;                 // gasto ADS por unidade × qtd
+    let shopee = 0;
+    if(r.origem === "SHOPEE" && !noPrice){
+      const fx = faixaPara(precoU, cfg.faixas);
+      if(fx) shopee = qty * (precoU * (+fx.comissao_pct || 0) / 100 + (+fx.taxa_fixa || 0));
+    }
+    const ir = fat * irPct;
+    // custo de envio: 1x por pedido (nº). Sem nº, cobra por linha.
+    const chaveEnvio = r.deadline + " ||| " + (r.pedido ?? "");
+    let envio = 0;
+    if(envioUnit && (!r.pedido || !pedidosComEnvio.has(chaveEnvio))){ envio = envioUnit; if(r.pedido) pedidosComEnvio.add(chaveEnvio); }
+    const lucro = fat - custo - shopee - ir - ads - envio;
+    const d = dias.get(r.deadline) || { fat:0, custo:0, shopee:0, ads:0, ir:0, envio:0, lucro:0, itens:[] };
+    d.fat += fat; d.custo += custo; d.shopee += shopee; d.ads += ads; d.ir += ir; d.envio += envio; d.lucro += lucro;
+    d.itens.push({ produto:r.produto, variacao:r.variacao, origem:r.origem, pedido:r.pedido,
+                   qty, precoU, fat, custo, shopee, ir, ads, envio, lucro, noPrice });
+    dias.set(r.deadline, d);
+  }
+  const linhasDia = [...dias.entries()].sort((a,b) => a[0].localeCompare(b[0])).map(([dia, d]) => ({ dia, ...d }));
+  renderFinanceiro(linhasDia, { semPreco, ir: cfg.ir, temFaixas: cfg.faixas.length > 0 });
+}
+
+function renderFinanceiro(linhasDia, meta){
+  const rep = document.getElementById("finReport");
+  const finMeta = document.getElementById("finMeta");
+  const wrap = document.getElementById("finChartWrap");
+  if(chartFin){ chartFin.destroy(); chartFin = null; }
+  if(!linhasDia.length){
+    wrap.style.display = "none";
+    rep.innerHTML = `<div class="finempty">Sem vendas com deadline no período selecionado.</div>`;
+    finMeta.textContent = "";
+    setStatus("Nada a mostrar no período.");
+    return;
+  }
+  // gráfico de linha: faturamento e lucro líquido por dia
+  wrap.style.display = "";
+  chartFin = new Chart(document.getElementById("finChart"), {
+    type: "line",
+    data: {
+      labels: linhasDia.map(d => fmtDia(d.dia)),
+      datasets: [
+        { label: "Faturamento",   data: linhasDia.map(d => d.fat),   borderColor: "#6d5efc", backgroundColor: "#6d5efc", tension: .25, borderWidth: 2, pointRadius: 3, fill: false },
+        { label: "Lucro líquido", data: linhasDia.map(d => d.lucro), borderColor: "#16a34a", backgroundColor: "#16a34a", tension: .25, borderWidth: 2, pointRadius: 3, fill: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { title: { display: true, text: "Dia (deadline)" } },
+        y: { beginAtZero: true, title: { display: true, text: "R$" }, ticks: { callback: v => "R$ " + v } }
+      },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + brl(ctx.parsed.y) } }
+      }
+    }
+  });
+  const tot = linhasDia.reduce((a,d) => ({
+    fat:a.fat+d.fat, custo:a.custo+d.custo, shopee:a.shopee+d.shopee, ir:a.ir+d.ir, ads:a.ads+d.ads, envio:a.envio+d.envio, lucro:a.lucro+d.lucro
+  }), { fat:0, custo:0, shopee:0, ir:0, ads:0, envio:0, lucro:0 });
+  const detLinha = it => {
+    const nome = esc(it.produto) + (it.variacao ? " · " + esc(it.variacao) : "");
+    const mt = [it.origem, it.pedido ? "#" + it.pedido : null].filter(Boolean).join(" · ");
+    return `<tr>
+      <td>${nome}${it.noPrice ? ' <span class="meta">⚠️ sem preço</span>' : ''}${mt ? ` <span class="meta">${esc(mt)}</span>` : ''}</td>
+      <td>${it.qty}</td>
+      <td>${brl(it.fat)}</td>
+      <td>${brl(it.custo)}</td>
+      <td>${brl(it.shopee)}</td>
+      <td>${brl(it.ir)}</td>
+      <td>${brl(it.ads)}</td>
+      <td>${brl(it.envio)}</td>
+      <td class="${it.lucro >= 0 ? 'pos' : 'neg'}">${brl(it.lucro)}</td></tr>`;
+  };
+  const linha = (d, i) => `<tr class="finday">
+      <td><button class="finexp" data-i="${i}" title="Ver vendas do dia" aria-label="Expandir">▸</button>${fmtData(d.dia)} <span class="meta">(${d.itens.length})</span></td>
+      <td>${brl(d.fat)}</td>
+      <td>${brl(d.custo)}</td>
+      <td>${brl(d.shopee)}</td>
+      <td>${brl(d.ir)}</td>
+      <td>${brl(d.ads)}</td>
+      <td>${brl(d.envio)}</td>
+      <td class="${d.lucro >= 0 ? 'pos' : 'neg'}">${brl(d.lucro)}</td></tr>
+    <tr class="findet" data-i="${i}" style="display:none"><td colspan="8">
+      <table class="findetail">
+        <thead><tr><th>Produto / Sub-produto</th><th>Qtd</th><th>Faturamento</th><th>Custo</th><th>Shopee</th><th>IR</th><th>ADS</th><th>Envio</th><th>Lucro</th></tr></thead>
+        <tbody>${d.itens.map(detLinha).join("")}</tbody>
+      </table></td></tr>`;
+  rep.innerHTML = `
+    <div class="finwrap"><table class="fin">
+      <thead><tr><th>Dia (deadline)</th><th>Faturamento</th><th>Custo produção</th><th>Taxa Shopee</th><th>IR (${meta.ir || 0}%)</th><th>ADS</th><th>Envio</th><th>Lucro líquido</th></tr></thead>
+      <tbody>${linhasDia.map(linha).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${brl(tot.fat)}</td><td>${brl(tot.custo)}</td><td>${brl(tot.shopee)}</td><td>${brl(tot.ir)}</td><td>${brl(tot.ads)}</td><td>${brl(tot.envio)}</td><td class="${tot.lucro >= 0 ? 'pos' : 'neg'}">${brl(tot.lucro)}</td></tr></tfoot>
+    </table></div>
+    ${meta.semPreco ? `<div class="finnote">⚠️ ${meta.semPreco} venda(s) sem preço de venda cadastrado — contadas como R$ 0. Cadastre em Produtos → botão $.</div>` : ""}
+    ${!meta.temFaixas ? `<div class="finnote">ℹ️ Sem faixas Shopee configuradas — taxa Shopee não foi descontada. Configure em ⚙️ Configurações.</div>` : ""}`;
+  finMeta.textContent = `${linhasDia.length} dia(s) · lucro ${brl(tot.lucro)}`;
+  setStatus(`💰 ${linhasDia.length} dia(s) · faturamento ${brl(tot.fat)} · lucro ${brl(tot.lucro)}.`);
+}
+
+// Alterna entre o gráfico de itens e o relatório financeiro
+function aplicarModoView(){
+  const fin = modoFin();
+  document.getElementById("panelProdutos").style.display = fin ? "none" : "";
+  document.getElementById("resumo").style.display        = fin ? "none" : "";
+  document.getElementById("cardChart").style.display     = fin ? "none" : "";
+  document.getElementById("diasField").style.display     = fin ? "none" : "";
+  document.getElementById("tendField").style.display     = fin ? "none" : "";
+  document.getElementById("finPanel").style.display      = fin ? "" : "none";
+  if(fin) relatorioFinanceiro(); else desenhar();
+}
+document.getElementById("modoView").addEventListener("change", aplicarModoView);
+
+// Expandir/colapsar as vendas do dia no relatório financeiro
+document.getElementById("finReport").addEventListener("click", e => {
+  const btn = e.target.closest(".finexp");
+  if(!btn) return;
+  const det = document.querySelector(`#finReport tr.findet[data-i="${btn.dataset.i}"]`);
+  if(!det) return;
+  const abrir = det.style.display === "none";
+  det.style.display = abrir ? "" : "none";
+  btn.textContent = abrir ? "▾" : "▸";
 });
 
 // init

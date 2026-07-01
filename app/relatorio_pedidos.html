@@ -220,6 +220,8 @@
       <a href="producao.html" title="Produção">🖨️<span class="lbl">Produção</span></a>
       <a href="vendas_grafico.html" title="Vendas">📈<span class="lbl">Vendas</span></a>
       <a href="usuarios.html" title="Usuários">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html" title="Configurações">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html" title="Fechamento">📒<span class="lbl">Fechamento</span></a>
     </nav>
     <button class="avatar" onclick="Auth.logout()" title="Sair">⎋</button>
   </aside>
@@ -447,11 +449,18 @@ async function processar(sources){
       const pedido = (pageText.match(/Pedido:\s*(\S+)/) || [])[1] || "(sem nº)";
       const origem = classify(pageText);
       for(const item of itens){
+        const desc = descricaoVariacao(item.varia);
+        const mult = multiplicadorVariacao(item.varia);   // número antes/depois da vírgula (ou 1)
+        // Sub-produto = o que vem entre parênteses depois do produto; sem parênteses,
+        // o sub-produto tem o mesmo nome do produto. `subqtd` = o número (multiplicador).
+        const temVar = item.varia !== "(sem variação)";
         linhas.push({
           pedido, origem,
           produto: item.prod,
-          varia: descricaoVariacao(item.varia),
-          qty: item.qty * multiplicadorVariacao(item.varia),
+          varia: desc,
+          subproduto: temVar ? desc : item.prod,
+          subqtd: mult,
+          qty: item.qty * mult,
           deadline
         });
       }
@@ -514,6 +523,31 @@ async function inserirPedidos(novas){
     const { error } = await db.from("pedidos").insert(rows.slice(i, i+500));
     if(error) throw error;
   }
+}
+
+// Catálogo de SUB-PRODUTOS: populado a partir de TODAS as linhas lidas na etiqueta,
+// independente da dedup de pedidos — o catálogo produto->sub-produto não duplica vendas,
+// então re-importar a mesma etiqueta também o preenche. Best-effort (não derruba a
+// importação se a migração supabase_migration_subprodutos.sql ainda não tiver rodado).
+async function sincronizarSubprodutos(linhas){
+  if(!db || !linhas.length) return;
+  try{
+    // garante os produtos (FK) antes dos sub-produtos
+    const prods = [...new Set(linhas.map(l => l.produto))].map(c => ({codigo:c}));
+    await db.from("produtos").upsert(prods, {onConflict:"codigo", ignoreDuplicates:true});
+    const subMap = new Map();
+    for(const l of linhas){
+      const nome = l.subproduto || l.produto;
+      const quantidade = l.subqtd || 1;                  // o número (multiplicador); cada número é um sub-produto
+      const k = l.produto + " ||| " + nome + " ||| " + quantidade;
+      if(!subMap.has(k)) subMap.set(k, { produto: l.produto, nome, quantidade });
+    }
+    if(subMap.size){
+      const { error } = await db.from("subprodutos").upsert([...subMap.values()],
+        { onConflict: "produto,nome,quantidade", ignoreDuplicates: true });
+      if(error) console.warn("subprodutos (rode supabase_migration_subprodutos_qtd_key.sql):", error.message);
+    }
+  }catch(err){ console.warn("subprodutos:", err.message); }
 }
 
 const formatarData = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -982,6 +1016,7 @@ async function run(sources){
     setStatus("Verificando vendas já existentes no banco…");
     const { novas, ignoradas } = await filtrarNovas(linhas);
     if(db && novas.length){ setStatus(`Gravando ${novas.length} venda(s) nova(s)…`); await inserirPedidos(novas); }
+    if(db) await sincronizarSubprodutos(linhas);   // catálogo de sub-produtos: de TODAS as linhas
     estoqueSalvo = await carregarEstoque();   // puxa estoque do banco (se configurado)
     resultado = agregarLinhas(novas);         // exibe só as vendas novas
     render(resultado);

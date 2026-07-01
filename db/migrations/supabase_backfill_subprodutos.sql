@@ -1,0 +1,16 @@
+-- ============================================================
+-- ⚠️ OBSOLETO — NÃO USE para popular a quantidade.
+-- ============================================================
+-- Este backfill lê de `pedidos`, mas lá o NÚMERO entre parênteses já se
+-- perdeu (pedidos.quantidade = número × qtd-da-linha, combinados). Por isso
+-- ele só conseguiria criar sub-produtos com quantidade = 1 — exatamente as
+-- linhas "fantasma" que queremos evitar agora que cada número é um
+-- sub-produto distinto.
+--
+-- ✅ CAMINHO CORRETO: rode `supabase_migration_subprodutos_qtd_key.sql`
+--    (que troca o índice único e, opcionalmente, limpa a tabela) e depois
+--    RE-IMPORTE as etiquetas (PDFs) na tela de Relatório. A importação
+--    grava produto + nome + quantidade corretos a partir do dado cru.
+--
+-- Mantido apenas como referência histórica.
+-- ============================================================

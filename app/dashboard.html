@@ -80,7 +80,14 @@
   .vazio{color:var(--muted);font-style:italic;padding:18px;text-align:center}
   .delta-up{color:#dcfce7}.delta-down{color:#fee2e2}
 
-  @media(max-width:820px){ .grid2{grid-template-columns:1fr} .rail{flex-basis:74px} .content{padding:18px} }
+  .col-left{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .grid-mm{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+  .col-left .grid-mm{margin-bottom:0}
+  .mmsub{color:var(--muted);font-size:11px;margin-top:2px}
+  .mmpct{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mmpct.pos{color:#166534}.mmpct.neg{color:#b91c1c}
+
+  @media(max-width:820px){ .grid2,.grid-mm{grid-template-columns:1fr} .rail{flex-basis:74px} .content{padding:18px} }
 </style>
 </head>
 <body>
@@ -94,6 +101,8 @@
       <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
       <a href="vendas_grafico.html">📈<span class="lbl">Vendas</span></a>
       <a href="usuarios.html">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html">📒<span class="lbl">Fechamento</span></a>
     </nav>
     <button class="avatar" id="sair" title="Sair">⎋</button>
   </aside>
@@ -111,10 +120,24 @@
     <div class="cards" id="cards"></div>
 
     <div class="grid2">
-      <div class="panel">
-        <h2>Vendas por dia</h2>
-        <p class="hint">Itens por dia — últimos 7 dias (por importação)</p>
-        <svg class="chart" id="chart"></svg>
+      <div class="col-left">
+        <div class="panel">
+          <h2>Vendas por dia</h2>
+          <p class="hint">Itens por dia — últimos 7 dias (por importação)</p>
+          <svg class="chart" id="chart"></svg>
+        </div>
+        <div class="grid-mm">
+          <div class="panel tablecard">
+            <h2>🏆 Top 3 — margem líquida</h2>
+            <p class="hint">Maior lucro líquido total no mês (soma das vendas)</p>
+            <table><tbody id="topMargem"><tr><td class="vazio">Carregando…</td></tr></tbody></table>
+          </div>
+          <div class="panel tablecard">
+            <h2>⚠️ 3 piores — margem líquida</h2>
+            <p class="hint">Menor lucro líquido total no mês (soma das vendas)</p>
+            <table><tbody id="piorMargem"><tr><td class="vazio">Carregando…</td></tr></tbody></table>
+          </div>
+        </div>
       </div>
       <div class="panel">
         <h2>Produção hoje</h2>
@@ -318,7 +341,125 @@ function renderTop(hojeLinhas, gmap){
   }).join("");
 }
 
+// ===================== Top / piores produtos por margem líquida (mês) =====================
+const USUARIO_FIN = sessao ? sessao.login : null;
+const brl = v => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+async function carregarPrecosSub(){
+  const acc = {};
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("subprodutos")
+      .select("produto,nome,quantidade,valor_venda,custo_producao").order("id",{ascending:true}).range(from, from+tam-1);
+    if(error){ console.warn("preços sub:", error.message); break; }
+    for(const r of data){
+      const Q = r.quantidade || 1, k = r.produto + " ||| " + r.nome;
+      const m = acc[k] || (acc[k] = { vS:0, vN:0, cS:0, cN:0 });
+      if(r.valor_venda    != null){ m.vS += (+r.valor_venda)/Q;    m.vN++; }
+      if(r.custo_producao != null){ m.cS += (+r.custo_producao)/Q; m.cN++; }
+    }
+    if(data.length < tam) break;
+  }
+  const out = {};
+  for(const k in acc){ const m = acc[k]; out[k] = { venda: m.vN ? m.vS/m.vN : null, custo: m.cN ? m.cS/m.cN : null }; }
+  return out;
+}
+async function carregarConfigFin(){
+  const cfg = { ir: 0, envio: 0, faixas: [] };
+  if(!USUARIO_FIN) return cfg;
+  const c = await db.from("config_usuario").select("ir_imposto_pct,custo_envio").eq("usuario", USUARIO_FIN).maybeSingle();
+  if(!c.error && c.data){
+    if(c.data.ir_imposto_pct != null) cfg.ir = +c.data.ir_imposto_pct;
+    if(c.data.custo_envio != null) cfg.envio = +c.data.custo_envio;
+  }
+  const f = await db.from("shopee_faixas").select("preco_min,preco_max,comissao_pct,taxa_fixa").eq("usuario", USUARIO_FIN).order("preco_min");
+  if(!f.error && f.data) cfg.faixas = f.data;
+  return cfg;
+}
+async function carregarAds(){
+  const map = {};
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("produtos").select("codigo,gasto_ads").order("codigo").range(from, from+tam-1);
+    if(error){ console.warn("ads:", error.message); break; }
+    for(const r of data) if(r.gasto_ads != null) map[r.codigo] = +r.gasto_ads;
+    if(data.length < tam) break;
+  }
+  return map;
+}
+function faixaPara(preco, faixas){
+  for(const f of faixas){
+    const min = f.preco_min != null ? +f.preco_min : 0;
+    const max = f.preco_max != null ? +f.preco_max : Infinity;
+    if(preco >= min && preco <= max) return f;
+  }
+  return null;
+}
+
+async function carregarMargens(){
+  if(!db) return;
+  const now = new Date();
+  const mesIni = toISO(new Date(now.getFullYear(), now.getMonth(), 1));
+  const mesFim = toISO(new Date(now.getFullYear(), now.getMonth()+1, 0));
+  const vendas = [];
+  const tam = 1000;
+  for(let from = 0; ; from += tam){
+    const { data, error } = await db.from("pedidos")
+      .select("pedido,produto,variacao,origem,quantidade,deadline")
+      .not("deadline","is",null).gte("deadline", mesIni).lte("deadline", mesFim)
+      .order("id",{ascending:true}).range(from, from+tam-1);
+    if(error){ console.warn("margens:", error.message); return; }
+    vendas.push(...data);
+    if(data.length < tam) break;
+  }
+  const [precos, cfg, adsMap] = await Promise.all([carregarPrecosSub(), carregarConfigFin(), carregarAds()]);
+  const irPct = (cfg.ir || 0) / 100, envioUnit = cfg.envio || 0;
+  const pedidosEnvio = new Set();
+  const prod = new Map();
+  for(const r of vendas){
+    const qty = r.quantidade || 0;
+    const p = precos[r.produto + " ||| " + (r.variacao ?? "")] || {};
+    const precoU = p.venda, custoU = p.custo;
+    const fat = (precoU || 0) * qty, custo = (custoU || 0) * qty, ads = (adsMap[r.produto] || 0) * qty;
+    let shopee = 0;
+    if(r.origem === "SHOPEE" && precoU != null){
+      const fx = faixaPara(precoU, cfg.faixas);
+      if(fx) shopee = qty * (precoU * (+fx.comissao_pct || 0) / 100 + (+fx.taxa_fixa || 0));
+    }
+    const ir = fat * irPct;
+    let envio = 0;
+    if(envioUnit && (!r.pedido || !pedidosEnvio.has(r.pedido))){ envio = envioUnit; if(r.pedido) pedidosEnvio.add(r.pedido); }
+    const cur = prod.get(r.produto) || { produto:r.produto, fat:0, custo:0, shopee:0, ir:0, ads:0, envio:0 };
+    cur.fat += fat; cur.custo += custo; cur.shopee += shopee; cur.ir += ir; cur.ads += ads; cur.envio += envio;
+    prod.set(r.produto, cur);
+  }
+  const arr = [...prod.values()]
+    .map(p => ({ ...p, lucro: p.fat - p.custo - p.shopee - p.ir - p.ads - p.envio }))
+    .filter(p => p.fat > 0)
+    .map(p => ({ ...p, margem: p.lucro / p.fat * 100 }));
+  // Top 3: maior lucro líquido TOTAL (soma das vendas do mês). Piores: pior margem %.
+  renderMargem("topMargem",  [...arr].sort((a,b) => b.lucro - a.lucro).slice(0,3),  ["🥇","🥈","🥉"], "lucro");
+  renderMargem("piorMargem", [...arr].sort((a,b) => a.lucro - b.lucro).slice(0,3),  ["🔻","🔻","🔻"], "lucro");
+}
+
+function renderMargem(id, lista, icones, modo){
+  const tb = document.getElementById(id);
+  if(!lista.length){ tb.innerHTML = `<tr><td class="vazio">Sem margem no mês. Cadastre preços em Produtos → $.</td></tr>`; return; }
+  tb.innerHTML = lista.map((p,i) => {
+    const head = modo === "lucro" ? brl(p.lucro) : p.margem.toFixed(1) + "%";
+    const val  = modo === "lucro" ? p.lucro : p.margem;
+    const sub  = modo === "lucro" ? `${p.margem.toFixed(1)}% margem · fat ${brl(p.fat)}`
+                                  : `Lucro ${brl(p.lucro)} · fat ${brl(p.fat)}`;
+    return `<tr>
+      <td style="width:1%"><span class="dot">${icones[i] || ""}</span></td>
+      <td><strong>${esc(p.produto)}</strong><div class="mmsub">${sub}</div></td>
+      <td class="mmpct ${val >= 0 ? 'pos' : 'neg'}">${head}</td>
+    </tr>`;
+  }).join("");
+}
+
 carregar();
+carregarMargens();
 </script>
 </body>
 </html>

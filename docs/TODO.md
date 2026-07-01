@@ -16,6 +16,9 @@
 - [ ] `supabase_migration_pedidos_deadline.sql` — coluna `deadline` em `pedidos`.
 - [ ] `supabase_migration_unificar_gcodes.sql` — unifica tudo em `gcode_arquivos` e dropa `gcodes`.
 - [ ] `supabase_migration_gcode_arquivos.sql` — tabela de gcodes (bulk + individual).
+- [ ] `supabase_migration_subprodutos.sql` — tabela `subprodutos` (1 produto → N sub-produtos, FK on delete cascade).
+- [ ] `supabase_migration_subprodutos_qtd_key.sql` — troca o índice único para `(produto, nome, quantidade)`.
+- [ ] `supabase_migration_configuracoes.sql` — tabelas `config_usuario` (Shopee %, IR %) e `filamentos` (tipo + valor/kg), por usuário.
 - [ ] Conferir se `supabase_migration_estoque_envio.sql` (coluna `origem` no estoque) já foi aplicada.
 - Schema completo de referência: `db/schema.sql`.
 

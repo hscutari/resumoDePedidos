@@ -31,6 +31,9 @@
   .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
               padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
   .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow);
+          cursor:pointer;border:0;font-size:14px}
 
   .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
   .inner{max-width:980px;margin:0 auto}
@@ -77,8 +80,10 @@
       <a href="producao.html">🖨️<span class="lbl">Produção</span></a>
       <a href="vendas_grafico.html">📈<span class="lbl">Vendas</span></a>
       <a class="active">👤<span class="lbl">Usuários</span></a>
+      <a href="configuracoes.html">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html">📒<span class="lbl">Fechamento</span></a>
     </nav>
-    <button id="sair">⎋<span class="lbl">Sair</span></button>
+    <button class="avatar" id="sair" title="Sair">⎋</button>
   </aside>
 
   <section class="content"><div class="inner">

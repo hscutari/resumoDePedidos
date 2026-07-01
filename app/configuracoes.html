@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurações — Resumo de Pedidos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/auth.js"></script>
+<style>
+  :root{
+    --bg:#eef1f7; --canvas:#f7f8fc; --card:#fff; --line:#eceef4; --txt:#1a1d29;
+    --muted:#7c8398; --accent:#6d5efc; --accent2:#9b8cff; --shadow:0 10px 30px rgba(31,38,72,.08);
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       margin:0;background:var(--bg);color:var(--txt)}
+
+  /* shell fintech */
+  .wrap{display:flex;min-height:100vh}
+  .rail{flex:0 0 92px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0;position:sticky;top:0;height:100vh}
+  .brand{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;
+         box-shadow:0 8px 18px rgba(109,94,252,.45);margin-bottom:6px;font-size:15px}
+  .nav{display:flex;flex-direction:column;gap:14px;align-items:center;flex:1}
+  .nav a,.nav button{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+         background:#f1f2f8;color:#5b6276;font-size:20px;text-decoration:none;cursor:pointer;transition:.15s;border:2px solid transparent}
+  .nav a:hover,.nav button:hover{background:#e7e9f6;color:var(--accent)}
+  .nav a.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 8px 18px rgba(109,94,252,.25)}
+  .nav a .lbl,.nav button .lbl{position:absolute;left:64px;white-space:nowrap;background:#1a1d29;color:#fff;font-size:12px;
+              padding:5px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:.15s;z-index:5}
+  .nav a:hover .lbl,.nav button:hover .lbl{opacity:1}
+  .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a7a);
+          color:#fff;display:grid;place-items:center;font-weight:700;box-shadow:var(--shadow);
+          cursor:pointer;border:0;font-size:14px}
+
+  .content{flex:1;background:var(--canvas);padding:26px 30px;min-width:0}
+  .inner{max-width:980px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .topbar h1{margin:0;font-size:22px}
+  .topbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .topactions{display:flex;gap:10px;align-items:center}
+  .whoami{display:flex;align-items:center;gap:8px;background:#fff;border-radius:999px;padding:7px 14px;box-shadow:var(--shadow);font-size:13px;font-weight:600;color:#3a4055}
+  .dbstatus{font-size:18px;cursor:default}
+
+  #status{font-size:13px;color:var(--muted);margin:0 0 16px}
+
+  .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:0 0 18px;overflow:hidden}
+  .card .ph{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--line)}
+  .card .ph h2{margin:0;font-size:15px}
+  .card .ph .sub{color:var(--muted);font-size:12px}
+  .card .pb{padding:18px 20px}
+
+  /* inputs */
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  input[type=text],input[type=number]{padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fafbff;color:var(--txt)}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  .go{border:0;border-radius:11px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;
+      background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(109,94,252,.3)}
+  .go.sm{padding:9px 14px;font-size:13px}
+  .ghost{background:#f1f2f8;color:#3a4055;border:0;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .ghost:hover{background:#e7e9f6}
+
+  /* filamentos */
+  .filgrid{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .filrow{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .filrow .fil-tipo,.filrow .func-nome{flex:1;min-width:120px}
+  .unit{display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted);font-size:13px}
+  .unit input{width:120px;text-align:right}
+  .rm-fil{border:0;background:#fee2e2;color:#b91c1c;border-radius:9px;padding:8px 11px;font-size:13px;font-weight:600;cursor:pointer}
+  .rm-fil:hover{background:#fecaca}
+  .filfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .filempty{padding:10px 2px;color:var(--muted);font-style:italic;font-size:13px}
+
+  /* % */
+  .pctline{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .pctinput{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+  .pctinput input{width:120px;text-align:right}
+  .msg{font-size:13px;min-height:18px;color:var(--muted)}
+  .msg.ok{color:#166534}.msg.err{color:#b91c1c}
+  .banner{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;color:#92400e;font-size:13px;margin:0 0 16px;display:none}
+
+  /* faixas Shopee */
+  table.faixas{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;min-width:520px}
+  table.faixas th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px}
+  table.faixas td{padding:5px 8px;border-top:1px solid var(--line)}
+  table.faixas tr:first-child td{border-top:0}
+  table.faixas input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:#fafbff;color:var(--txt);text-align:right}
+  table.faixas input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6d5efc22}
+  table.faixas td.rm{width:1%}
+  .rm-faixa{border:0;background:#fee2e2;color:#b91c1c;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer}
+  .rm-faixa:hover{background:#fecaca}
+  .faixafoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+  @media(max-width:820px){ .rail{flex-basis:74px} .content{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">HS</div>
+    <nav class="nav">
+      <a href="dashboard.html" title="Início">🏠<span class="lbl">Início</span></a>
+      <a href="relatorio_pedidos.html" title="Resumo">📋<span class="lbl">Resumo</span></a>
+      <a href="produtos.html" title="Produtos">📦<span class="lbl">Produtos</span></a>
+      <a href="producao.html" title="Produção">🖨️<span class="lbl">Produção</span></a>
+      <a href="vendas_grafico.html" title="Vendas">📈<span class="lbl">Vendas</span></a>
+      <a href="usuarios.html" title="Usuários">👤<span class="lbl">Usuários</span></a>
+      <a class="active" title="Configurações">⚙️<span class="lbl">Configurações</span></a>
+      <a href="fechamento.html" title="Fechamento">📒<span class="lbl">Fechamento</span></a>
+    </nav>
+    <button class="avatar" id="sair" title="Sair">⎋</button>
+  </aside>
+
+  <section class="content"><div class="inner">
+    <div class="topbar">
+      <div><h1>⚙️ Configurações</h1><p>Preferências da sua conta — filamentos, impostos por venda e IR</p></div>
+      <div class="topactions">
+        <span class="whoami" id="quem"></span>
+        <span class="dbstatus" id="dbstatus" title="Status do banco">⚪</span>
+      </div>
+    </div>
+
+    <div id="status"></div>
+    <div class="banner" id="banner"></div>
+
+    <!-- FILAMENTOS -->
+    <div class="card">
+      <div class="ph"><h2>🧵 Filamentos</h2><span class="sub">tipo e valor por kg</span></div>
+      <div class="pb">
+        <div class="filgrid" id="filLista"></div>
+        <div class="filfoot">
+          <button class="ghost" id="addFil" type="button">➕ Adicionar filamento</button>
+          <button class="go sm" id="salvarFil" type="button">Salvar filamentos</button>
+        </div>
+        <div class="msg" id="msgFil"></div>
+      </div>
+    </div>
+
+    <!-- SHOPEE -->
+    <div class="card">
+      <div class="ph"><h2>🛍 Shopee</h2><span class="sub">taxa por faixa de preço</span></div>
+      <div class="pb">
+        <div style="overflow-x:auto">
+          <table class="faixas">
+            <thead><tr>
+              <th>De (R$)</th><th>Até (R$)</th><th>Comissão %</th><th>Taxa fixa R$</th><th></th>
+            </tr></thead>
+            <tbody id="faixasBody"></tbody>
+          </table>
+        </div>
+        <div class="faixafoot">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="ghost" id="addFaixa" type="button">➕ Adicionar faixa</button>
+            <button class="ghost" id="restaurarFaixas" type="button">↺ Restaurar padrão</button>
+          </div>
+          <button class="go sm" id="salvarFaixas" type="button">Salvar faixas</button>
+        </div>
+        <div class="msg" id="msgShopee"></div>
+      </div>
+    </div>
+
+    <!-- IR -->
+    <div class="card">
+      <div class="ph"><h2>🧾 IR</h2><span class="sub">imposto sobre o faturamento</span></div>
+      <div class="pb">
+        <div class="pctline">
+          <div class="field">
+            <label>IR sobre faturamento</label>
+            <div class="pctinput"><input type="number" id="irPct" min="0" step="0.01" placeholder="0,00"> %</div>
+          </div>
+          <button class="go sm" id="salvarIR" type="button">Salvar</button>
+        </div>
+        <div class="msg" id="msgIR"></div>
+      </div>
+    </div>
+
+    <!-- ENVIO -->
+    <div class="card">
+      <div class="ph"><h2>🚚 Envio</h2><span class="sub">custo de envio por pedido</span></div>
+      <div class="pb">
+        <div class="pctline">
+          <div class="field">
+            <label>Custo por envio</label>
+            <div class="pctinput">R$ <input type="number" id="envioVal" min="0" step="0.01" placeholder="0,00"></div>
+          </div>
+          <button class="go sm" id="salvarEnvio" type="button">Salvar</button>
+        </div>
+        <div class="msg" id="msgEnvio"></div>
+      </div>
+    </div>
+
+    <!-- ALUGUEL -->
+    <div class="card">
+      <div class="ph"><h2>🏠 Aluguel</h2><span class="sub">valor do aluguel</span></div>
+      <div class="pb">
+        <div class="pctline">
+          <div class="field">
+            <label>Aluguel</label>
+            <div class="pctinput">R$ <input type="number" id="aluguelVal" min="0" step="0.01" placeholder="0,00"></div>
+          </div>
+          <button class="go sm" id="salvarAluguel" type="button">Salvar</button>
+        </div>
+        <div class="msg" id="msgAluguel"></div>
+      </div>
+    </div>
+
+    <!-- FUNCIONÁRIOS -->
+    <div class="card">
+      <div class="ph"><h2>👷 Funcionários</h2><span class="sub">nome e salário</span></div>
+      <div class="pb">
+        <div class="filgrid" id="funcLista"></div>
+        <div class="filfoot">
+          <button class="ghost" id="addFunc" type="button">➕ Adicionar funcionário</button>
+          <button class="go sm" id="salvarFunc" type="button">Salvar funcionários</button>
+        </div>
+        <div class="msg" id="msgFunc"></div>
+      </div>
+    </div>
+  </div></section>
+</div>
+
+<script>
+const db = Auth.db;
+const USUARIO = (Auth.sessao() && Auth.sessao().login) || null;
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const setStatus = s => document.getElementById("status").textContent = s;
+const num = v => { const t = String(v ?? "").trim().replace(",", "."); if(t === "") return null; const n = parseFloat(t); return isNaN(n) ? null : Math.max(0, n); };
+const msg = (id, t, cls) => { const el = document.getElementById(id); el.textContent = t; el.className = "msg" + (cls ? " " + cls : ""); };
+
+const sessao = Auth.sessao();
+document.getElementById("quem").textContent = sessao ? `👤 ${sessao.nome || sessao.login}` : "";
+document.getElementById("sair").addEventListener("click", () => Auth.logout());
+const dbel = document.getElementById("dbstatus");
+dbel.textContent = db ? "🟢" : "⚪";
+dbel.title = db ? "Banco conectado (Supabase)" : "Banco não configurado";
+
+let filamentos = [];   // { id?, tipo, valor_kg }
+
+// ---- Filamentos ----
+function renderFilamentos(){
+  const lista = document.getElementById("filLista");
+  if(!filamentos.length){
+    lista.innerHTML = `<div class="filempty">Nenhum filamento. Clique em “➕ Adicionar filamento”.</div>`;
+    return;
+  }
+  lista.innerHTML = filamentos.map((f, i) => `
+    <div class="filrow" data-i="${i}">
+      <input type="text" class="fil-tipo" placeholder="Tipo (ex.: PLA, PETG)" value="${esc(f.tipo ?? "")}">
+      <span class="unit">R$ <input type="number" class="fil-valor" min="0" step="0.01" placeholder="0,00" value="${f.valor_kg != null ? f.valor_kg : ""}"> / kg</span>
+      <button class="rm-fil" type="button" data-i="${i}" title="Remover">🗑️</button>
+    </div>`).join("");
+}
+
+// mantém o estado em memória conforme o usuário digita
+document.getElementById("filLista").addEventListener("input", e => {
+  const row = e.target.closest(".filrow"); if(!row) return;
+  const i = +row.dataset.i;
+  if(e.target.classList.contains("fil-tipo")) filamentos[i].tipo = e.target.value;
+  if(e.target.classList.contains("fil-valor")) filamentos[i].valor_kg = num(e.target.value);
+});
+document.getElementById("filLista").addEventListener("click", e => {
+  const rm = e.target.closest(".rm-fil"); if(!rm) return;
+  filamentos.splice(+rm.dataset.i, 1);
+  renderFilamentos();
+});
+document.getElementById("addFil").addEventListener("click", () => {
+  filamentos.push({ tipo: "", valor_kg: null });
+  renderFilamentos();
+  const inputs = document.querySelectorAll("#filLista .fil-tipo");
+  if(inputs.length) inputs[inputs.length - 1].focus();
+});
+
+// Salva: substitui os filamentos do usuário (apaga e reinsere os preenchidos)
+document.getElementById("salvarFil").addEventListener("click", async () => {
+  if(!db){ msg("msgFil", "Banco não configurado.", "err"); return; }
+  const validos = filamentos.filter(f => (f.tipo || "").trim() !== "");
+  msg("msgFil", "Salvando…");
+  try{
+    const del = await db.from("filamentos").delete().eq("usuario", USUARIO);
+    if(del.error) throw del.error;
+    if(validos.length){
+      const rows = validos.map(f => ({ usuario: USUARIO, tipo: f.tipo.trim(), valor_kg: f.valor_kg }));
+      const ins = await db.from("filamentos").insert(rows);
+      if(ins.error) throw ins.error;
+    }
+    msg("msgFil", `✅ ${validos.length} filamento(s) salvo(s).`, "ok");
+    await carregarFilamentos();
+  }catch(err){ msg("msgFil", "Erro: " + err.message, "err"); console.error(err); }
+});
+
+async function carregarFilamentos(){
+  if(!db) return;
+  const { data, error } = await db.from("filamentos")
+    .select("id,tipo,valor_kg").eq("usuario", USUARIO).order("tipo");
+  if(error){ mostrarBanner(error); return; }
+  filamentos = data || [];
+  renderFilamentos();
+}
+
+// ---- Shopee: faixas de taxa por preço ----
+// Valores padrão (Shopee Brasil 2026): comissão % + tarifa fixa por faixa.
+const FAIXAS_PADRAO = [
+  { preco_min: 0,   preco_max: 7.99,   comissao_pct: 50, taxa_fixa: 0 },
+  { preco_min: 8,   preco_max: 79.99,  comissao_pct: 20, taxa_fixa: 4 },
+  { preco_min: 80,  preco_max: 99.99,  comissao_pct: 14, taxa_fixa: 16 },
+  { preco_min: 100, preco_max: 199.99, comissao_pct: 14, taxa_fixa: 20 },
+  { preco_min: 200, preco_max: null,   comissao_pct: 14, taxa_fixa: 26 }
+];
+let faixas = [];   // { id?, preco_min, preco_max, comissao_pct, taxa_fixa }
+
+function renderFaixas(){
+  const tb = document.getElementById("faixasBody");
+  tb.innerHTML = faixas.map((f, i) => `
+    <tr data-i="${i}">
+      <td><input type="number" class="fx-min" min="0" step="0.01" value="${f.preco_min != null ? f.preco_min : ""}"></td>
+      <td><input type="number" class="fx-max" min="0" step="0.01" placeholder="sem teto" value="${f.preco_max != null ? f.preco_max : ""}"></td>
+      <td><input type="number" class="fx-com" min="0" step="0.01" value="${f.comissao_pct != null ? f.comissao_pct : ""}"></td>
+      <td><input type="number" class="fx-fix" min="0" step="0.01" value="${f.taxa_fixa != null ? f.taxa_fixa : ""}"></td>
+      <td class="rm"><button class="rm-faixa" type="button" data-i="${i}" title="Remover faixa">🗑️</button></td>
+    </tr>`).join("");
+}
+
+document.getElementById("faixasBody").addEventListener("input", e => {
+  const tr = e.target.closest("tr"); if(!tr) return;
+  const i = +tr.dataset.i, c = e.target.classList;
+  if(c.contains("fx-min")) faixas[i].preco_min = num(e.target.value);
+  if(c.contains("fx-max")) faixas[i].preco_max = num(e.target.value);
+  if(c.contains("fx-com")) faixas[i].comissao_pct = num(e.target.value);
+  if(c.contains("fx-fix")) faixas[i].taxa_fixa = num(e.target.value);
+});
+document.getElementById("faixasBody").addEventListener("click", e => {
+  const rm = e.target.closest(".rm-faixa"); if(!rm) return;
+  faixas.splice(+rm.dataset.i, 1);
+  renderFaixas();
+});
+document.getElementById("addFaixa").addEventListener("click", () => {
+  faixas.push({ preco_min: 0, preco_max: null, comissao_pct: null, taxa_fixa: null });
+  renderFaixas();
+});
+document.getElementById("restaurarFaixas").addEventListener("click", () => {
+  faixas = FAIXAS_PADRAO.map(f => ({ ...f }));
+  renderFaixas();
+  msg("msgShopee", "Padrão 2026 restaurado — clique em Salvar para gravar.");
+});
+
+// Salva: substitui as faixas do usuário (apaga e reinsere as preenchidas)
+document.getElementById("salvarFaixas").addEventListener("click", async () => {
+  if(!db){ msg("msgShopee", "Banco não configurado.", "err"); return; }
+  msg("msgShopee", "Salvando…");
+  try{
+    const del = await db.from("shopee_faixas").delete().eq("usuario", USUARIO);
+    if(del.error) throw del.error;
+    if(faixas.length){
+      const rows = faixas.map(f => ({
+        usuario: USUARIO,
+        preco_min: f.preco_min ?? 0,
+        preco_max: f.preco_max,
+        comissao_pct: f.comissao_pct,
+        taxa_fixa: f.taxa_fixa
+      }));
+      const ins = await db.from("shopee_faixas").insert(rows);
+      if(ins.error) throw ins.error;
+    }
+    msg("msgShopee", `✅ ${faixas.length} faixa(s) salva(s).`, "ok");
+    await carregarFaixas();
+  }catch(err){ msg("msgShopee", "Erro: " + err.message, "err"); console.error(err); }
+});
+
+// Carrega as faixas; se o usuário ainda não tem nenhuma, cadastra os padrões.
+async function carregarFaixas(){
+  if(!db) return;
+  const { data, error } = await db.from("shopee_faixas")
+    .select("id,preco_min,preco_max,comissao_pct,taxa_fixa").eq("usuario", USUARIO).order("preco_min");
+  if(error){ mostrarBanner(error); return; }
+  if(!data || !data.length){
+    const rows = FAIXAS_PADRAO.map(f => ({ usuario: USUARIO, ...f }));
+    const ins = await db.from("shopee_faixas").insert(rows);
+    if(ins.error){ mostrarBanner(ins.error); faixas = FAIXAS_PADRAO.map(f => ({ ...f })); renderFaixas(); return; }
+    faixas = FAIXAS_PADRAO.map(f => ({ ...f }));
+    renderFaixas();
+    return;
+  }
+  faixas = data;
+  renderFaixas();
+}
+
+// ---- IR (% sobre faturamento) ----
+async function salvarConfig(campos, msgId){
+  if(!db){ msg(msgId, "Banco não configurado.", "err"); return; }
+  msg(msgId, "Salvando…");
+  try{
+    const row = { usuario: USUARIO, atualizado_em: new Date().toISOString(), ...campos };
+    const { error } = await db.from("config_usuario")
+      .upsert(row, { onConflict: "usuario" });
+    if(error) throw error;
+    msg(msgId, "✅ Salvo.", "ok");
+  }catch(err){ msg(msgId, "Erro: " + err.message, "err"); console.error(err); }
+}
+document.getElementById("salvarIR").addEventListener("click", () =>
+  salvarConfig({ ir_imposto_pct: num(document.getElementById("irPct").value) }, "msgIR"));
+document.getElementById("salvarEnvio").addEventListener("click", () =>
+  salvarConfig({ custo_envio: num(document.getElementById("envioVal").value) }, "msgEnvio"));
+document.getElementById("salvarAluguel").addEventListener("click", () =>
+  salvarConfig({ aluguel: num(document.getElementById("aluguelVal").value) }, "msgAluguel"));
+
+// ---- Funcionários (nome + salário) ----
+let funcs = [];   // { id?, nome, salario }
+function renderFuncionarios(){
+  const lista = document.getElementById("funcLista");
+  if(!funcs.length){
+    lista.innerHTML = `<div class="filempty">Nenhum funcionário. Clique em “➕ Adicionar funcionário”.</div>`;
+    return;
+  }
+  lista.innerHTML = funcs.map((f, i) => `
+    <div class="filrow" data-i="${i}">
+      <input type="text" class="func-nome" placeholder="Nome do funcionário" value="${esc(f.nome ?? "")}">
+      <span class="unit">R$ <input type="number" class="func-salario" min="0" step="0.01" placeholder="0,00" value="${f.salario != null ? f.salario : ""}"></span>
+      <button class="rm-fil" type="button" data-i="${i}" title="Remover">🗑️</button>
+    </div>`).join("");
+}
+document.getElementById("funcLista").addEventListener("input", e => {
+  const row = e.target.closest(".filrow"); if(!row) return;
+  const i = +row.dataset.i;
+  if(e.target.classList.contains("func-nome")) funcs[i].nome = e.target.value;
+  if(e.target.classList.contains("func-salario")) funcs[i].salario = num(e.target.value);
+});
+document.getElementById("funcLista").addEventListener("click", e => {
+  const rm = e.target.closest(".rm-fil"); if(!rm) return;
+  funcs.splice(+rm.dataset.i, 1);
+  renderFuncionarios();
+});
+document.getElementById("addFunc").addEventListener("click", () => {
+  funcs.push({ nome: "", salario: null });
+  renderFuncionarios();
+  const inputs = document.querySelectorAll("#funcLista .func-nome");
+  if(inputs.length) inputs[inputs.length - 1].focus();
+});
+document.getElementById("salvarFunc").addEventListener("click", async () => {
+  if(!db){ msg("msgFunc", "Banco não configurado.", "err"); return; }
+  const validos = funcs.filter(f => (f.nome || "").trim() !== "");
+  msg("msgFunc", "Salvando…");
+  try{
+    const del = await db.from("funcionarios").delete().eq("usuario", USUARIO);
+    if(del.error) throw del.error;
+    if(validos.length){
+      const rows = validos.map(f => ({ usuario: USUARIO, nome: f.nome.trim(), salario: f.salario }));
+      const ins = await db.from("funcionarios").insert(rows);
+      if(ins.error) throw ins.error;
+    }
+    msg("msgFunc", `✅ ${validos.length} funcionário(s) salvo(s).`, "ok");
+    await carregarFuncionarios();
+  }catch(err){ msg("msgFunc", "Erro: " + err.message, "err"); console.error(err); }
+});
+async function carregarFuncionarios(){
+  if(!db) return;
+  const { data, error } = await db.from("funcionarios")
+    .select("id,nome,salario").eq("usuario", USUARIO).order("nome");
+  if(error){ mostrarBanner(error); return; }
+  funcs = data || [];
+  renderFuncionarios();
+}
+
+async function carregarConfig(){
+  if(!db) return;
+  const { data, error } = await db.from("config_usuario")
+    .select("ir_imposto_pct,custo_envio,aluguel").eq("usuario", USUARIO).maybeSingle();
+  if(error){ mostrarBanner(error); return; }
+  if(data){
+    if(data.ir_imposto_pct != null) document.getElementById("irPct").value = data.ir_imposto_pct;
+    if(data.custo_envio != null) document.getElementById("envioVal").value = data.custo_envio;
+    if(data.aluguel != null) document.getElementById("aluguelVal").value = data.aluguel;
+  }
+}
+
+function mostrarBanner(error){
+  const b = document.getElementById("banner");
+  b.style.display = "";
+  b.innerHTML = `⚠️ Não foi possível carregar as configurações. Rode <code>supabase_migration_configuracoes.sql</code> no Supabase. <small>(${esc(error.message)})</small>`;
+  console.warn(error);
+}
+
+// init
+(async function(){
+  if(!db){ setStatus("⚪ Banco não configurado."); renderFilamentos(); renderFaixas(); renderFuncionarios(); return; }
+  setStatus("Carregando configurações…");
+  await Promise.all([carregarFilamentos(), carregarFaixas(), carregarConfig(), carregarFuncionarios()]);
+  setStatus("");
+})();
+</script>
+</body>
+</html>
